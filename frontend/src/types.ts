@@ -120,7 +120,7 @@ export interface DepositResult {
   saved_cents: number
   card_balance_cents: number
   bonus_cents: number        // бонус за этот взнос, уже начисленный
-  bonus_pending_cents: number // крупный бонус (от 10 BYN) ждёт подтверждения родителя
+  bonus_pending_cents: number // бонус к взносу больше 10 BYN ждёт подтверждения родителя
   bonus_left_cents: number   // остаток лимита бонуса на месяц
   status: string
 }

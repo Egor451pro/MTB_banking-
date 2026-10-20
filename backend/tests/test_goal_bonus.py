@@ -46,7 +46,7 @@ async def test_big_bonus_waits_for_parent_and_month_limit_holds(client: AsyncCli
 
     first = await client.post(f"/goals/{goal_id}/deposit", json={"amount_cents": 1250}, headers=CHILD)
     body = first.json()
-    assert body["bonus_cents"] == 0                  # 10 BYN и больше — только после подтверждения
+    assert body["bonus_cents"] == 0                  # взнос больше 10 BYN — бонус только после подтверждения
     assert body["bonus_pending_cents"] == 1000       # 100% от 12,50 BYN, но не больше лимита 10 BYN
     assert body["saved_cents"] == 1250
     assert body["bonus_left_cents"] == 0
@@ -91,3 +91,14 @@ async def test_goals_list_shows_bonus_and_month_left(client: AsyncClient, seed_t
     assert body["items"][0]["bonus_cents"] == 100
     assert body["bonus_month_cap_cents"] == 1000
     assert body["bonus_month_left_cents"] == 900
+
+
+@pytest.mark.asyncio
+async def test_deposit_over_10_byn_needs_confirmation_even_with_small_bonus(client: AsyncClient, seed_test_data):
+    goal_id = await _goal_with_bonus(client, 10)
+    r = await client.post(f"/goals/{goal_id}/deposit", json={"amount_cents": 1200}, headers=CHILD)
+    body = r.json()
+    assert body["bonus_cents"] == 0 and body["bonus_pending_cents"] == 120
+    assert body["saved_cents"] == 1200
+    pending = (await client.get("/bonuses/pending", headers=PARENT)).json()["items"]
+    assert [b["amount_cents"] for b in pending] == [120]

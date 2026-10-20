@@ -19,8 +19,8 @@ from app.schemas.goal import (
 
 # Бонус родителя начисляется при каждом взносе, но не больше этой суммы в месяц на ребёнка
 MONTHLY_BONUS_CAP_CENTS = 1000
-# Бонус за один взнос от этой суммы не начисляется сам — его подтверждает родитель
-BONUS_CONFIRM_CENTS = 1000
+# Если один взнос больше этой суммы, бонус к нему не начисляется сам — его подтверждает родитель
+BONUS_CONFIRM_DEPOSIT_CENTS = 1000
 
 
 def _month_start_utc() -> datetime:
@@ -191,8 +191,8 @@ class GoalService:
         if goal.parent_bonus_percent > 0:
             bonus = min(amount_cents * goal.parent_bonus_percent // 100, bonus_left)
 
-        # Крупный бонус ждёт подтверждения родителя, обычный начисляется сразу
-        needs_confirm = bonus >= BONUS_CONFIRM_CENTS
+        # Бонус к крупному взносу (больше 10 BYN) ждёт подтверждения родителя, остальные начисляются сразу
+        needs_confirm = bonus > 0 and amount_cents > BONUS_CONFIRM_DEPOSIT_CENTS
         credited = 0 if needs_confirm else bonus
 
         # Списываем с карты и добавляем в цель

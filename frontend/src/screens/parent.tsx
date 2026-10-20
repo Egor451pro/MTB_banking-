@@ -576,7 +576,7 @@ export function ParentRequests() {
                   <div className="min-w-0 truncate text-[17px] font-semibold text-mt-ink">Цель «{b.goal_title}»</div>
                   <div className="shrink-0 text-xl font-bold tabular-nums text-mt-ink">+ {money(b.amount_cents)}</div>
                 </div>
-                <div className="text-[13px] text-muted">Крупный бонус добавится в накопления после вашего подтверждения</div>
+                <div className="text-[13px] text-muted">Взнос больше 10 BYN — бонус добавится в накопления после вашего подтверждения</div>
                 <div className="mt-4 grid grid-cols-2 gap-2">
                   <Btn small tone="danger" onClick={async () => { await api.rejectBonus(b.id); await pb.reload(); toast('Бонус отклонён') }}>Отклонить</Btn>
                   <Btn small onClick={async () => { await api.approveBonus(b.id); await pb.reload(); toast('Бонус добавлен в накопления') }}>Подтвердить</Btn>

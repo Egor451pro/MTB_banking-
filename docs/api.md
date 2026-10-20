@@ -409,7 +409,7 @@ Parent видит задания своих детей, child только св�
 
 ### Подтверждение крупного бонуса
 
-Если бонус за один взнос ≥ 10 BYN (`BONUS_CONFIRM_CENTS`), он не начисляется сразу: взнос проходит, а бонус получает статус `pending` и ждёт родителя. Ответ `POST /goals/{id}/deposit` содержит `bonus_pending_cents` (а `bonus_cents` = 0). Ждущий бонус учитывается в месячном лимите; отклонённый — нет.
+Если один взнос больше 10 BYN (`BONUS_CONFIRM_DEPOSIT_CENTS`), бонус к нему не начисляется сразу: взнос проходит, а бонус получает статус `pending` и ждёт родителя. Ответ `POST /goals/{id}/deposit` содержит `bonus_pending_cents` (а `bonus_cents` = 0). Ждущий бонус учитывается в месячном лимите; отклонённый — нет.
 
 - `GET /bonuses/pending` (родитель) → `{items: [{id, child_id, child_name, goal_title, amount_cents, created_at}]}`
 - `POST /bonuses/{id}/approve` (родитель) → `{id, status: "credited", saved_cents}`; бонус входит в накопления

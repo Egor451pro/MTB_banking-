@@ -36,7 +36,7 @@ interface DB {
 
 // Бонус родителя к накоплениям: не больше 10 BYN в месяц на ребёнка (как на бэкенде)
 const BONUS_MONTH_CAP = 1000
-const BONUS_CONFIRM = 1000  // бонус за один взнос от этой суммы подтверждает родитель
+const BONUS_CONFIRM_DEPOSIT = 1000  // если взнос больше 10 BYN, бонус к нему подтверждает родитель
 const monthKey = () => new Date().toISOString().slice(0, 7)
 
 // Уроки финансовой грамотности: правильный ответ знает только «сервер»
@@ -488,8 +488,8 @@ export function mockApi(): Api {
       // Бонус родителя начисляется сразу: процент от взноса, но не больше остатка лимита месяца
       const left = bonusLeft(c.id)
       const bonus = Math.min(Math.floor((amount * g.parent_bonus_percent) / 100), left)
-      // Крупный бонус (от 10 BYN) ждёт подтверждения родителя, обычный начисляется сразу
-      const needsConfirm = bonus >= BONUS_CONFIRM
+      // Бонус к взносу больше 10 BYN ждёт подтверждения родителя, обычный начисляется сразу
+      const needsConfirm = bonus > 0 && amount > BONUS_CONFIRM_DEPOSIT
       const credited = needsConfirm ? 0 : bonus
       a.balance_cents -= amount
       g.saved_cents += amount + credited
