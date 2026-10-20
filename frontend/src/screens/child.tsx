@@ -1,6 +1,6 @@
 import { useState } from 'react'
-import { api } from '../api'
-import { CATEGORY_ICON, CATEGORY_LABEL, money, toCents } from '../format'
+import { api, session } from '../api'
+import { CATEGORY_ICON, CATEGORY_LABEL, PERMISSION_INFO, dateShort, money, toCents } from '../format'
 import { useData } from '../hooks'
 import { Icon, type IconName } from '../icons'
 import { useNav } from '../nav'
@@ -8,7 +8,7 @@ import {
   Avatar, BalanceCard, Badge, Btn, Card, Empty, Field, Header, IconTile, Loading, Note, Progress,
   Row, Section, Sheet, toast,
 } from '../ui'
-import type { Category, DeclineReason, PayResult, ReqType } from '../types'
+import type { Category, DeclineReason, LessonResult, PayResult, PermissionKey, ReqType } from '../types'
 import { GoalCard, LevelRing, REQ_ICON, TaskHead, TxList, requestText } from './shared'
 
 // ───────── Главная ребёнка ─────────
@@ -16,6 +16,7 @@ export function ChildHome({ meId }: { meId: number }) {
   const { push, setTab } = useNav()
   const { data: c } = useData(() => api.getChild(meId), [meId], 2000)
   const reqs = useData(() => api.listRequests(), [], 2000)
+  const al = useData(() => api.getAllowance(meId), [meId])
   if (!c) return <><Header title="Привет!" /><Loading /></>
   const waiting = reqs.data?.items.filter((r) => r.status === 'pending').length ?? 0
   const lv = c.level
@@ -42,6 +43,9 @@ export function ChildHome({ meId }: { meId: number }) {
           ))}
         </div>
 
+        {al.data?.active && al.data.next_date && (
+          <Note icon="calendar">Карманные {money(al.data.amount_cents)} {al.data.period === 'day' ? 'каждый день' : 'каждую неделю'} · следующие {dateShort(al.data.next_date)}</Note>
+        )}
         {waiting > 0 && <Note icon="clock">Ждут ответа родителя: {waiting}</Note>}
 
         <Card onClick={() => setTab('level')}>
@@ -161,15 +165,20 @@ const REQ_OPTIONS: { id: ReqType; title: string; sub: string }[] = [
   { id: 'money', title: 'Деньги на карту', sub: 'Не хватает на покупку' },
   { id: 'limit_increase', title: 'Поднять дневной лимит', sub: 'Нужна покупка дороже лимита' },
   { id: 'category_unlock', title: 'Открыть категорию', sub: 'Например, игры или подписки' },
+  { id: 'product_access', title: 'Доступ к продукту', sub: 'Цели, вклад, виртуальная карта' },
 ]
 
-export function RequestScreen({ type: t0, amount: a0, category: c0 }: { type?: ReqType; amount?: number; category?: Category }) {
+export function RequestScreen({ type: t0, amount: a0, category: c0, permission: p0 }: { type?: ReqType; amount?: number; category?: Category; permission?: PermissionKey }) {
   const { back } = useNav()
   const [type, setType] = useState<ReqType>(t0 ?? 'money')
   const [amount, setAmount] = useState(a0 ? String(a0 / 100) : '')
   const [category, setCategory] = useState<Category>(c0 ?? 'games')
   const [comment, setComment] = useState('')
+  const [permission, setPermission] = useState<PermissionKey | null>(p0 ?? null)
   const { data, reload } = useData(() => api.listRequests(), [], 2000)
+  const perms = useData(() => api.getPermissions(session.userId), [])
+  // Просить можно то, что выключено и не закрыто по возрасту
+  const askable = (perms.data?.items ?? []).filter((p) => !p.enabled && !p.locked_reason)
   const cats = (Object.keys(CATEGORY_LABEL) as Category[]).filter((c) => c !== 'adult18')
 
   return (
@@ -194,7 +203,30 @@ export function RequestScreen({ type: t0, amount: a0, category: c0 }: { type?: R
           })}
         </Card>
 
-        {type !== 'category_unlock'
+        {type === 'product_access' && (
+          askable.length === 0
+            ? <Note icon="check">Все доступные продукты уже открыты</Note>
+            : (
+              <Card className="divide-y divide-line p-0">
+                {askable.map((p) => {
+                  const on = permission === p.key
+                  const info = PERMISSION_INFO[p.key]
+                  return (
+                    <button key={p.key} onClick={() => setPermission(p.key)} className="flex w-full items-center gap-3 px-4 py-3 text-left">
+                      <IconTile name={info.icon} tone={on ? 'solid' : 'blue'} size={36} />
+                      <div className="min-w-0 flex-1">
+                        <div className="text-[15px] font-semibold text-mt-ink">{info.title}</div>
+                        <div className="text-[13px] text-muted">{info.sub}</div>
+                      </div>
+                      {on && <Icon name="check" size={20} className="text-[#2F6FE4]" />}
+                    </button>
+                  )
+                })}
+              </Card>
+            )
+        )}
+
+        {type === 'product_access' ? null : type !== 'category_unlock'
           ? <Field label={type === 'money' ? 'Сколько нужно' : 'Какой лимит нужен в день'} inputMode="decimal" value={amount} onChange={setAmount} placeholder="0" suffix="BYN" />
           : (
             <div className="grid grid-cols-3 gap-2">
@@ -213,11 +245,14 @@ export function RequestScreen({ type: t0, amount: a0, category: c0 }: { type?: R
         <Field label="Зачем? Родитель увидит" value={comment} onChange={setComment} placeholder="Например, на экскурсию" />
         <Btn icon="chat" onClick={async () => {
           const cents = toCents(amount)
-          if (type !== 'category_unlock' && !(cents > 0)) { toast('Укажите сумму'); return }
+          const needsSum = type === 'money' || type === 'limit_increase'
+          if (needsSum && !(cents > 0)) { toast('Укажите сумму'); return }
+          if (type === 'product_access' && !permission) { toast('Выбери продукт'); return }
           await api.createRequest({
             type,
-            amount_cents: type === 'category_unlock' ? undefined : cents,
+            amount_cents: needsSum ? cents : undefined,
             category: type === 'category_unlock' ? category : undefined,
+            permission: type === 'product_access' ? permission ?? undefined : undefined,
             comment,
           })
           setComment(''); setAmount(''); await reload()
@@ -245,7 +280,9 @@ export function RequestScreen({ type: t0, amount: a0, category: c0 }: { type?: R
 
 // ───────── Цели ─────────
 export function ChildGoals({ meId }: { meId: number }) {
+  const { push } = useNav()
   const { data, reload } = useData(() => api.getGoals(meId), [meId], 3000)
+  const perms = useData(() => api.getPermissions(meId), [meId], 3000)
   const [create, setCreate] = useState(false)
   const [title, setTitle] = useState('')
   const [target, setTarget] = useState('')
@@ -257,7 +294,14 @@ export function ChildGoals({ meId }: { meId: number }) {
     <>
       <Header title="Мои цели" subtitle={`Отложено ${money(saved)}`} />
       <div className="space-y-3 p-4">
-        <Btn icon="plus" onClick={() => setCreate(true)}>Новая цель</Btn>
+        {perms.data && !perms.data.items.find((p) => p.key === 'goals')?.enabled
+          ? (
+            <>
+              <Note icon="lock">Родитель пока выключил цели</Note>
+              <Btn icon="chat" onClick={() => push({ name: 'request', params: { type: 'product_access', permission: 'goals' } })}>Попросить доступ</Btn>
+            </>
+          )
+          : <Btn icon="plus" onClick={() => setCreate(true)}>Новая цель</Btn>}
         {!data.items.length && <Empty text="Поставь первую цель — например, на велосипед" icon="target" />}
         {data.items.map((g) => (
           <GoalCard key={g.id} g={g}>
@@ -320,30 +364,123 @@ export function ChildTasks() {
   )
 }
 
-// ───────── Уровень ─────────
+// ───────── Награды: уровень, баллы, уроки, мои возможности ─────────
 export function ChildLevel({ meId }: { meId: number }) {
+  const { push } = useNav()
   const { data: c } = useData(() => api.getChild(meId), [meId], 2000)
-  if (!c) return <><Header title="Мой уровень" /><Loading /></>
+  const lessons = useData(() => api.getLessons(), [], 3000)
+  const loyalty = useData(() => api.getLoyalty(), [], 3000)
+  const perms = useData(() => api.getPermissions(meId), [meId], 3000)
+  if (!c) return <><Header title="Награды" /><Loading /></>
   const lv = c.level
+  const done = lessons.data?.items.filter((l) => l.completed).length ?? 0
   return (
     <>
-      <Header title="Мой уровень" subtitle="Расти вместе с картой" tall />
+      <Header title="Награды" subtitle="Учись, копи и расти" tall />
       <div className="-mt-12 space-y-5 px-4 pb-6">
-        <Card className="flex flex-col items-center py-6 text-center shadow-[0_12px_32px_-16px_rgba(20,20,22,0.35)]">
+        <Card className="flex items-center gap-4 shadow-[0_10px_30px_-18px_rgba(20,20,22,0.35)]">
           <LevelRing level={lv} />
-          <div className="mt-3 text-sm tabular-nums text-muted">
-            {lv.xp} XP · {lv.xp_to_next > 0 ? `ещё ${lv.xp_to_next} до уровня ${lv.level + 1}` : 'максимальный уровень'}
+          <div className="min-w-0 flex-1">
+            <div className="text-[13px] tabular-nums text-muted">{lv.xp} XP</div>
+            <div className="text-[15px] font-semibold text-mt-ink">{lv.xp_to_next > 0 ? `Ещё ${lv.xp_to_next} XP до уровня ${lv.level + 1}` : 'Максимальный уровень'}</div>
+            <button onClick={() => push({ name: 'loyalty' })} className="mt-3 flex w-full items-center gap-2 rounded-2xl bg-[#F3F5F8] px-3 py-2.5 text-left">
+              <Icon name="coins" size={20} className="text-[#2F6FE4]" />
+              <span className="flex-1 text-sm font-semibold tabular-nums text-mt-ink">{(loyalty.data?.points ?? 0).toLocaleString('ru-RU')} баллов</span>
+              <Icon name="chevron-right" size={18} className="text-[#A3ABB8]" />
+            </button>
           </div>
         </Card>
 
-        <Section title="Как расти">
+        <Section title="Уроки" action={<span className="text-sm tabular-nums text-muted">{done} из {lessons.data?.items.length ?? 0}</span>}>
           <Card className="divide-y divide-line p-0">
-            <Row icon="tasks" title="Выполняй задания" sub="За каждое — награда и опыт" />
-            <Row icon="target" title="Копи на цели" sub="Родитель может добавить бонус" />
-            <Row icon="shield" title="Трать с умом" sub="Укладывайся в дневной лимит" />
-            <Row icon="arrow-up" title="В 18 лет" sub="Карта станет взрослой, история останется" />
+            {(lessons.data?.items ?? []).map((l) => (
+              <Row
+                key={l.id} icon={l.completed ? 'check' : 'book'} iconTone={l.completed ? 'solid' : 'blue'} chevron
+                title={l.title} sub={l.completed ? 'Пройден' : `+${l.xp_reward} XP · +${l.points_reward} баллов`}
+                onClick={() => push({ name: 'lesson', params: { id: l.id } })}
+              />
+            ))}
           </Card>
         </Section>
+
+        <Section title="Мои возможности">
+          <Card className="divide-y divide-line p-0">
+            {(perms.data?.items ?? []).map((p) => {
+              const info = PERMISSION_INFO[p.key]
+              return (
+                <Row
+                  key={p.key} icon={info.icon} iconTone={p.enabled ? 'blue' : 'gray'} title={info.title}
+                  sub={p.enabled ? 'Доступно' : p.locked_reason ?? 'Выключено родителем'}
+                  right={p.enabled || p.locked_reason ? undefined : (
+                    <Btn small full={false} tone="secondary" onClick={() => push({ name: 'request', params: { type: 'product_access', permission: p.key } })}>Попросить</Btn>
+                  )}
+                />
+              )
+            })}
+          </Card>
+        </Section>
+
+        <p className="px-1 text-xs text-muted">В 18 лет карта станет взрослой, а вся история и баллы останутся с тобой.</p>
+      </div>
+    </>
+  )
+}
+
+// ───────── Урок финансовой грамотности ─────────
+export function LessonScreen({ id }: { id: number }) {
+  const { back } = useNav()
+  const { data, reload } = useData(() => api.getLessons(), [])
+  const [picked, setPicked] = useState<number | null>(null)
+  const [result, setResult] = useState<LessonResult | null>(null)
+  const [wasDone, setWasDone] = useState(false)
+  const lesson = data?.items.find((l) => l.id === id)
+  if (!lesson) return <><Header title="Урок" onBack={back} /><Loading /></>
+  return (
+    <>
+      <Header title={lesson.title} subtitle={lesson.description} onBack={back} />
+      <div className="space-y-4 p-4">
+        <Card className="space-y-3">
+          {lesson.content.map((p, i) => <p key={i} className="text-[15px] leading-relaxed text-mt-ink">{p}</p>)}
+        </Card>
+
+        <Section title="Вопрос">
+          <Card className="space-y-3">
+            <p className="text-[15px] font-semibold text-mt-ink">{lesson.question}</p>
+            {lesson.options.map((o, i) => {
+              const chosen = picked === i
+              const tone = result && chosen ? (result.correct ? 'border-[#2F6FE4] bg-[#E9F1FE]' : 'border-mt-red bg-[#FDECEB]') : chosen ? 'border-[#2F6FE4]' : 'border-[#DDE2EA]'
+              return (
+                <button
+                  key={i} disabled={!!result?.correct}
+                  onClick={async () => {
+                    setPicked(i)
+                    setWasDone(lesson.completed)
+                    try {
+                      const r = await api.answerLesson(lesson.id, i)
+                      setResult(r)
+                      if (r.correct) await reload()
+                    } catch (e) { toast((e as Error).message) }
+                  }}
+                  className={`w-full rounded-2xl border-2 px-4 py-3 text-left text-[15px] font-medium text-mt-ink transition ${tone}`}
+                >
+                  {o}
+                </button>
+              )
+            })}
+          </Card>
+        </Section>
+
+        {result && (
+          <Note tone={result.correct ? 'blue' : 'red'} icon={result.correct ? 'check' : 'x'}>{result.explanation}</Note>
+        )}
+        {result?.correct && (
+          <>
+            <div className="text-center text-sm text-muted">
+              {wasDone ? 'Урок уже был пройден — награда начисляется один раз' : `+${lesson.xp_reward} XP и +${lesson.points_reward} баллов`}
+            </div>
+            <Btn onClick={back}>Готово</Btn>
+          </>
+        )}
       </div>
     </>
   )

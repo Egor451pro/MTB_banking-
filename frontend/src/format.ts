@@ -1,4 +1,4 @@
-import type { Category, DeclineReason, ReqType } from './types'
+import type { Category, DeclineReason, PermissionKey, ReqType } from './types'
 import type { IconName } from './icons'
 
 // Деньги приходят в копейках; в рубли переводим только здесь, на экране.
@@ -51,13 +51,27 @@ export const REQ_LABEL: Record<ReqType, string> = {
   money: 'Деньги на карту',
   limit_increase: 'Поднять дневной лимит',
   category_unlock: 'Открыть категорию',
+  product_access: 'Доступ к продукту',
 }
 
 export const REQ_SHORT: Record<ReqType, string> = {
   money: 'Деньги',
   limit_increase: 'Лимит',
   category_unlock: 'Категория',
+  product_access: 'Доступ',
 }
+
+// Права ребёнка в Moby (п. 2 ТЗ: продукты, функционал, операции)
+export const PERMISSION_INFO: Record<PermissionKey, { title: string; sub: string; icon: IconName }> = {
+  online_payments: { title: 'Онлайн-покупки', sub: 'Крупные — с подтверждением родителя', icon: 'globe' },
+  goals: { title: 'Цели и копилки', sub: 'Откладывать деньги на мечту', icon: 'target' },
+  virtual_card: { title: 'Виртуальная карта', sub: 'Выпуск второй карты в Moby', icon: 'card-plus' },
+  savings: { title: 'Детский вклад', sub: 'Накопления на долгий срок', icon: 'wallet' },
+  partner_offers: { title: 'Предложения партнёров', sub: 'Скидки и бонусы за баллы', icon: 'gift' },
+}
+
+// Баллы лояльности: 1 балл = 1 копейка
+export const points = (n: number) => `${n.toLocaleString('ru-RU')} ${plural(n, 'балл', 'балла', 'баллов')}`
 
 // 1 запрос, 2 запроса, 5 запросов
 export function plural(n: number, one: string, few: string, many: string): string {
@@ -71,6 +85,10 @@ export function plural(n: number, one: string, few: string, many: string): strin
 
 // API отдаёт '7-13', показываем с длинным тире
 export const ageLabel = (g: string) => `${g.replace('-', '–')} лет`
+
+export function dateShort(isoDate: string): string {
+  return new Date(isoDate).toLocaleDateString('ru-RU', { day: 'numeric', month: 'long' })
+}
 
 export function dateTime(iso: string): string {
   const d = new Date(iso)

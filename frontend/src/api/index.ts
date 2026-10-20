@@ -1,6 +1,7 @@
 import type {
-  AccessRequest, Category, ChildDetail, FamilyResp, Goal, LevelInfo, LimitItem, Me,
-  PackageReq, PayRequest, PayResult, ReqStatus, ReqType, Task, Transaction,
+  AccessRequest, Allowance, ApproveResult, Category, ChildDetail, FamilyResp, Goal, Lesson, LessonResult,
+  LevelInfo, LimitItem, LoyaltyInfo, Me, PackageReq, PayRequest, PayResult, PendingPurchase, Permission,
+  PermissionKey, ReqStatus, ReqType, Task, Transaction,
 } from '../types'
 import { realApi } from './real'
 import { mockApi } from './mock'
@@ -21,7 +22,7 @@ export interface Api {
   putLimits(childId: number, items: LimitItem[]): Promise<{ items: LimitItem[] }>
   simulatePayment(req: PayRequest): Promise<PayResult>
   getTransactions(childId: number, limit?: number): Promise<{ items: Transaction[] }>
-  createRequest(req: { type: ReqType; amount_cents?: number; category?: Category; comment: string }): Promise<{ id: number; status: string }>
+  createRequest(req: { type: ReqType; amount_cents?: number; category?: Category; permission?: PermissionKey; comment: string }): Promise<{ id: number; status: string }>
   listRequests(status?: ReqStatus): Promise<{ items: AccessRequest[] }>
   approveRequest(id: number): Promise<{ id: number; status: string }>
   rejectRequest(id: number): Promise<{ id: number; status: string }>
@@ -37,6 +38,26 @@ export interface Api {
   getLevel(childId: number): Promise<LevelInfo>
   acceptSuggestion(childId: number): Promise<{ applied: boolean }>
   demoReset(): Promise<{ status: string }>
+
+  // Подтверждение покупок родителем
+  listPendingPurchases(): Promise<{ items: PendingPurchase[] }>
+  approvePurchase(txId: number): Promise<ApproveResult>
+  declinePurchase(txId: number): Promise<ApproveResult>
+  // Карманные деньги
+  getAllowance(childId: number): Promise<Allowance>
+  putAllowance(childId: number, a: { amount_cents: number; period: 'day' | 'week'; active: boolean }): Promise<Allowance>
+  payAllowance(childId: number): Promise<{ balance_cents: number }>
+  // Права ребёнка в Moby
+  getPermissions(childId: number): Promise<{ items: Permission[] }>
+  putPermissions(childId: number, items: { key: PermissionKey; enabled: boolean }[]): Promise<{ items: Permission[] }>
+  // Уроки финансовой грамотности
+  getLessons(childId?: number): Promise<{ items: Lesson[] }>
+  answerLesson(lessonId: number, optionIndex: number): Promise<LessonResult>
+  // Лояльность
+  getLoyalty(childId?: number): Promise<LoyaltyInfo>
+  redeemOffer(offerId: number): Promise<{ points: number; code: string }>
+  // Потеря карты: блок старой и перевыпуск
+  reissueCard(cardId: number): Promise<{ id: number; last4: string; status: string }>
 }
 
 const base = (import.meta.env.VITE_API_URL as string | undefined)?.trim()

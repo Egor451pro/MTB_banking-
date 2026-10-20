@@ -310,3 +310,83 @@ Parent видит задания своих детей, child только св�
 | 2. Ребёнок платит в столовой (ок) и пытается купить игру (отказ) | child | `POST /payments/simulate` ×2 |
 | 3. Ребёнок просит поднять лимит, родитель одобряет | child, parent | `POST /requests`, `POST /requests/7/approve` |
 | 4. Ребёнок делает задание, родитель подтверждает, растёт уровень | child, parent | `POST /tasks/9/done`, `POST /tasks/9/confirm`, `GET /children/2/level` |
+
+---
+
+## Дополнение: функции из ТЗ (v2)
+
+Всё ниже уже работает во фронте на mock (`frontend/src/api/mock.ts`) — это эталон поведения.
+
+### Подтверждение покупок родителем
+Крупная онлайн-покупка (> 20 BYN) получает статус `pending` и ждёт родителя.
+
+`GET /purchases/pending` — parent: покупки детей своей семьи, child: свои.
+```json
+{"items": [{"id": 6, "amount_cents": 2500, "direction": "out", "category": "shopping", "merchant": "Магазин одежды",
+  "status": "pending", "decline_reason": null, "created_at": "2026-10-20T12:07:00+00:00", "child_id": 3, "child_name": "Аня"}]}
+```
+
+`POST /transactions/{id}/approve` — parent. Перед списанием заново проверить карту и баланс:
+карта заблокирована → `declined` + `card_blocked`; не хватает денег → `declined` + `insufficient_funds`;
+иначе списать, начислить кешбэк баллами, статус `approved`.
+`POST /transactions/{id}/decline` — parent, статус `declined`.
+Ответ обоих: `{"id": 6, "status": "approved", "balance_cents": 1800, "message": "Покупка подтверждена"}`.
+Если операция не `pending` → 409 `conflict`.
+
+### Карманные деньги
+`GET /children/{id}/allowance` → `{"amount_cents": 1000, "period": "week", "active": true, "next_date": "2026-10-26"}`
+(`period`: `day` | `week`; `next_date` — завтра или ближайший понедельник, `null` если выключено).
+`PUT /children/{id}/allowance` — parent, тело `{"amount_cents": 1000, "period": "week", "active": true}`; при `active` сумма > 0.
+`POST /children/{id}/allowance/pay` — parent, демо «выплатить сейчас»: пополнить карту, операция `in` с merchant «Карманные деньги». Ответ `{"balance_cents": 2250}`.
+
+### Права ребёнка в Moby
+Ключи: `online_payments`, `goals`, `virtual_card`, `savings`, `partner_offers`.
+
+`GET /children/{id}/permissions`
+```json
+{"items": [{"key": "online_payments", "enabled": false, "locked_reason": "Доступно с 14 лет"},
+           {"key": "goals", "enabled": true, "locked_reason": null}]}
+```
+`online_payments` для 7–13 лет всегда `enabled: false` с `locked_reason`.
+`PUT /children/{id}/permissions` — parent, тело `{"items": [{"key": "goals", "enabled": false}]}` (меняются только переданные ключи).
+Включить право с `locked_reason` → 403.
+
+Права влияют на логику:
+- `online_payments` — правило `online_not_allowed` в `/payments/simulate` (вместо согласия из пакета);
+- `goals` выключено → `POST /goals` отвечает 403 «Цели выключены родителем — попроси доступ»;
+- `partner_offers` выключено → в `GET /loyalty` у ребёнка пустой `offers`, `redeem` → 403.
+
+Хранить можно в таблице `consents` (`consent_type` = ключ права): право включено ⇔ строка есть.
+
+Новый тип запроса: `POST /requests` с `{"type": "product_access", "permission": "savings", "comment": "..."}`.
+В `GET /requests` у элементов появляется поле `permission`. `approve` включает право (если оно не закрыто по возрасту).
+
+### Уроки финансовой грамотности
+`GET /lessons` (child — свой прогресс; parent — `?child_id=2`)
+```json
+{"items": [{"id": 1, "title": "Что такое бюджет", "description": "...", "content": ["абзац", "абзац"],
+  "question": "У тебя 10 BYN на неделю...", "options": ["...", "...", "..."], "xp_reward": 20, "points_reward": 50, "completed": false}]}
+```
+Правильный ответ в ответе API не отдаётся.
+`POST /lessons/{id}/answer` — child, тело `{"option_index": 1}`.
+Ответ: `{"correct": true, "explanation": "...", "xp": 120, "level": 3, "points": 390}`.
+Награда (XP + баллы) начисляется один раз — за первый правильный ответ. 4 урока — в `LESSONS` в `mock.ts`.
+
+### Программа лояльности (1 балл = 1 копейка)
+`GET /loyalty` — свои баллы; parent может `?child_id=2`.
+```json
+{"points": 340, "cashback": [{"category": "education", "percent": 5}],
+ "offers": [{"id": 2, "partner": "Книжный магазин", "title": "Скидка 10% на книги", "description": "...", "audience": "child", "points_cost": 150}]}
+```
+Кешбэк начисляется ребёнку при одобренной покупке: `floor(amount_cents * percent / 100)` баллов.
+Категории: education 5%, transport 3%, food 2%, entertainment 2%.
+`offers`: ребёнку — `child` и `family`, родителю — `parent` и `family`.
+`POST /loyalty/offers/{id}/redeem` — списать `points_cost`, ответ `{"points": 190, "code": "MT-21234"}`; не хватает баллов → 422.
+Баллы хранить в `User.points` (поле уже есть).
+
+### Потеря карты
+`POST /cards/{id}/reissue` — parent: перевыпуск (новые `last4`, статус `active`, баланс сохраняется).
+Ответ `{"id": 1, "last4": "5821", "status": "active"}`.
+
+### Уровни
+`GET /children/{id}/level` и `/level/suggestion/accept` фронт больше не использует — уровень берётся из `GET /children/{id}`.

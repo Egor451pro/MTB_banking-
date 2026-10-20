@@ -59,5 +59,19 @@ export function realApi(base: string): Api {
     getLevel: (id) => get(`/children/${id}/level`),
     acceptSuggestion: (id) => post(`/children/${id}/level/suggestion/accept`),
     demoReset: () => post('/demo/reset'),
+
+    listPendingPurchases: () => get('/purchases/pending'),
+    approvePurchase: (id) => post(`/transactions/${id}/approve`),
+    declinePurchase: (id) => post(`/transactions/${id}/decline`),
+    getAllowance: (id) => get(`/children/${id}/allowance`),
+    putAllowance: (id, a) => put(`/children/${id}/allowance`, a),
+    payAllowance: (id) => post(`/children/${id}/allowance/pay`),
+    getPermissions: (id) => get(`/children/${id}/permissions`),
+    putPermissions: (id, items) => put(`/children/${id}/permissions`, { items }),
+    getLessons: (childId) => get(`/lessons${childId ? `?child_id=${childId}` : ''}`),
+    answerLesson: (id, option_index) => post(`/lessons/${id}/answer`, { option_index }),
+    getLoyalty: (childId) => get(`/loyalty${childId ? `?child_id=${childId}` : ''}`),
+    redeemOffer: (id) => post(`/loyalty/offers/${id}/redeem`),
+    reissueCard: (id) => post(`/cards/${id}/reissue`),
   }
 }

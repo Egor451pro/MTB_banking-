@@ -10,7 +10,7 @@ export type DeclineReason =
   | 'card_blocked' | 'category_blocked' | 'online_not_allowed'
   | 'insufficient_funds' | 'limit_exceeded'
 export type TxStatus = 'approved' | 'declined' | 'pending'
-export type ReqType = 'money' | 'limit_increase' | 'category_unlock'
+export type ReqType = 'money' | 'limit_increase' | 'category_unlock' | 'product_access'
 export type ReqStatus = 'pending' | 'approved' | 'rejected'
 export type TaskStatus = 'new' | 'done' | 'confirmed' | 'rejected'
 export type ConsentType = 'card_issue' | 'moby_access' | 'online_payments'
@@ -97,6 +97,7 @@ export interface AccessRequest {
   type: ReqType
   amount_cents: number | null
   category: Category | null
+  permission?: PermissionKey | null // для product_access
   comment: string
   status: ReqStatus
   created_at: string
@@ -134,4 +135,72 @@ export interface PackageReq {
   child_name: string
   child_birth_date: string
   consents: ConsentType[]
+}
+
+// ───────── Дополнение к контракту: функции из ТЗ ─────────
+
+// Права ребёнка в Moby: какие продукты он может оформлять, каким функционалом пользоваться
+export type PermissionKey = 'online_payments' | 'goals' | 'virtual_card' | 'savings' | 'partner_offers'
+export interface Permission {
+  key: PermissionKey
+  enabled: boolean
+  locked_reason: string | null // не null — право нельзя включить (например, по возрасту)
+}
+
+// Покупка, которая ждёт подтверждения родителя (крупная онлайн-покупка)
+export interface PendingPurchase extends Transaction {
+  child_id: number
+  child_name: string
+}
+
+export interface ApproveResult {
+  id: number
+  status: TxStatus
+  balance_cents: number
+  message: string
+}
+
+// Карманные деньги: регулярный перевод от родителя
+export interface Allowance {
+  amount_cents: number
+  period: 'day' | 'week'
+  active: boolean
+  next_date: string | null // YYYY-MM-DD
+}
+
+// Урок финансовой грамотности
+export interface Lesson {
+  id: number
+  title: string
+  description: string
+  content: string[]
+  question: string
+  options: string[]
+  xp_reward: number
+  points_reward: number
+  completed: boolean
+}
+
+export interface LessonResult {
+  correct: boolean
+  explanation: string
+  xp: number
+  level: number
+  points: number
+}
+
+// Программа лояльности: баллы (1 балл = 1 копейка) и предложения партнёров
+export interface Offer {
+  id: number
+  partner: string
+  title: string
+  description: string
+  audience: 'child' | 'parent' | 'family'
+  points_cost: number
+}
+
+export interface LoyaltyInfo {
+  points: number
+  cashback: { category: Category; percent: number }[]
+  offers: Offer[]
 }

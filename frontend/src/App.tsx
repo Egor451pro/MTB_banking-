@@ -4,7 +4,8 @@ import { NavProvider, useNav } from './nav'
 import { BottomNav, ToastHost, Loading, type TabDef } from './ui'
 import { useData } from './hooks'
 import type { Me } from './types'
-import { ChildGoals, ChildHome, ChildLevel, ChildPay, ChildTasks, RequestScreen } from './screens/child'
+import { ChildGoals, ChildHome, ChildLevel, ChildPay, ChildTasks, LessonScreen, RequestScreen } from './screens/child'
+import { LoyaltyScreen } from './screens/shared'
 import { ChildManage, PackageFlow, ParentHome, ParentProducts, ParentRequests, ParentTasks } from './screens/parent'
 
 const DEMO_USERS = [
@@ -14,9 +15,10 @@ const DEMO_USERS = [
 ]
 
 function ParentShell() {
-  const { tab, setTab, stack } = useNav()
+  const { tab, setTab, stack, back } = useNav()
   const fam = useData(() => api.getFamily(), [], 3000)
-  const pending = fam.data?.children.reduce((s, c) => s + c.pending_requests, 0) ?? 0
+  const pp = useData(() => api.listPendingPurchases(), [], 3000)
+  const pending = (fam.data?.children.reduce((s, c) => s + c.pending_requests, 0) ?? 0) + (pp.data?.items.length ?? 0)
   const tabs: TabDef[] = [
     { id: 'home', label: 'Главная', icon: 'home' },
     { id: 'products', label: 'Продукты', icon: 'card' },
@@ -27,6 +29,7 @@ function ParentShell() {
   let body
   if (top?.name === 'child') body = <ChildManage key={top.params!.id} id={top.params!.id} />
   else if (top?.name === 'package') body = <PackageFlow />
+  else if (top?.name === 'loyalty') body = <LoyaltyScreen onBack={back} />
   else if (tab === 'products') body = <ParentProducts />
   else if (tab === 'requests') body = <ParentRequests />
   else if (tab === 'tasks') body = <ParentTasks />
@@ -40,17 +43,19 @@ function ParentShell() {
 }
 
 function ChildShell({ me }: { me: Me }) {
-  const { tab, setTab, stack } = useNav()
+  const { tab, setTab, stack, back } = useNav()
   const tabs: TabDef[] = [
     { id: 'home', label: 'Главная', icon: 'home' },
     { id: 'pay', label: 'Оплата', icon: 'card' },
     { id: 'goals', label: 'Цели', icon: 'target' },
     { id: 'tasks', label: 'Задания', icon: 'tasks' },
-    { id: 'level', label: 'Уровень', icon: 'star' },
+    { id: 'level', label: 'Награды', icon: 'star' },
   ]
   const top = stack[stack.length - 1]
   let body
   if (top?.name === 'request') body = <RequestScreen {...(top.params ?? {})} />
+  else if (top?.name === 'lesson') body = <LessonScreen key={top.params!.id} id={top.params!.id} />
+  else if (top?.name === 'loyalty') body = <LoyaltyScreen onBack={back} />
   else if (tab === 'pay') body = <ChildPay meId={me.id} />
   else if (tab === 'goals') body = <ChildGoals meId={me.id} />
   else if (tab === 'tasks') body = <ChildTasks />

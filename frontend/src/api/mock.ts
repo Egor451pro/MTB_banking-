@@ -1,8 +1,8 @@
 import type { Api } from './index'
 import { session } from './index'
 import type {
-  AccessRequest, AgeGroup, Category, DeclineReason, Goal, LevelInfo, LimitItem,
-  PayResult, ReqStatus, Task, Transaction,
+  AccessRequest, AgeGroup, Allowance, Category, DeclineReason, Goal, Lesson, LevelInfo, LimitItem,
+  Offer, PayResult, Permission, PermissionKey, ReqStatus, Task, Transaction,
 } from '../types'
 import { ageFrom, CATEGORY_LABEL } from '../format'
 
@@ -12,7 +12,7 @@ import { ageFrom, CATEGORY_LABEL } from '../format'
 
 interface UserRow {
   id: number; role: 'parent' | 'child'; name: string; family_id: number
-  birth_date: string; xp: number
+  birth_date: string; xp: number; points: number
 }
 interface AccountRow { id: number; owner_id: number; last4: string; balance_cents: number; status: 'active' | 'blocked' }
 interface TxRow extends Transaction { account_id: number }
@@ -25,10 +25,64 @@ interface DB {
   requests: ReqRow[]
   goals: (Goal & { child_id: number })[]
   tasks: Task[]
-  online: Record<number, boolean>      // разрешены ли онлайн-платежи
+  perms: Record<number, Record<PermissionKey, boolean>> // права ребёнка в Moby
+  allowance: Record<number, Omit<Allowance, 'next_date'>>
+  lessonsDone: Record<number, number[]>
   accepted: Record<number, boolean>    // принято ли предложение уровня
   seq: { tx: number; req: number; goal: number; task: number; user: number; acc: number }
 }
+
+// Уроки финансовой грамотности: правильный ответ знает только «сервер»
+const LESSONS: (Omit<Lesson, 'completed'> & { answer: number; explanation: string })[] = [
+  {
+    id: 1, title: 'Что такое бюджет', description: 'Как распределить карманные деньги на неделю', xp_reward: 20, points_reward: 50,
+    content: ['Бюджет — это план: сколько денег есть и на что их потратить.', 'Если разделить деньги на дни недели, их хватит до следующих карманных.'],
+    question: 'У тебя 10 BYN на неделю. Как поступить разумнее?',
+    options: ['Потратить всё в понедельник', 'Разделить на каждый день', 'Отдать другу на хранение'],
+    answer: 1, explanation: 'По 1–2 BYN в день — и денег хватит на всю неделю.',
+  },
+  {
+    id: 2, title: 'Как копить на цель', description: 'Считаем, сколько недель копить на мечту', xp_reward: 20, points_reward: 50,
+    content: ['Цель — это сумма и срок. Чем больше откладываешь, тем быстрее её достигнешь.', 'Родитель может добавить бонус к накоплениям — так копится быстрее.'],
+    question: 'Велосипед стоит 300 BYN, ты откладываешь 10 BYN в неделю. Сколько недель копить?',
+    options: ['10 недель', '30 недель', '300 недель'],
+    answer: 1, explanation: '300 ÷ 10 = 30 недель. С бонусом родителя получится быстрее.',
+  },
+  {
+    id: 3, title: 'Осторожно, мошенники', description: 'Почему код из СМС нельзя называть никому', xp_reward: 30, points_reward: 80,
+    content: ['Мошенники обещают призы и просят код из СМС или данные карты.', 'Банк никогда не спрашивает код. Если просят — это обман.'],
+    question: 'Тебе пишут: «Назови код из СМС и получишь приз». Что делать?',
+    options: ['Назвать код', 'Никому не сообщать и рассказать родителю', 'Переслать сообщение другу'],
+    answer: 1, explanation: 'Код из СМС — ключ к твоим деньгам. Не сообщай его никому и покажи сообщение родителю.',
+  },
+  {
+    id: 4, title: 'Импульсивные покупки', description: 'Правило суток перед покупкой', xp_reward: 20, points_reward: 50,
+    content: ['Иногда хочется купить что-то прямо сейчас, а через день желание проходит.', 'Подожди сутки перед крупной покупкой — так тратишь только на то, что действительно нужно.'],
+    question: 'Хочешь игру за 15 BYN прямо сейчас. Что поможет решить?',
+    options: ['Купить сразу', 'Подождать сутки и подумать', 'Занять деньги у друга'],
+    answer: 1, explanation: 'Если через сутки игра всё ещё нужна — можно копить или попросить родителя.',
+  },
+]
+
+// Кешбэк баллами в семейных категориях (1 балл = 1 копейка)
+const CASHBACK: { category: Category; percent: number }[] = [
+  { category: 'education', percent: 5 },
+  { category: 'transport', percent: 3 },
+  { category: 'food', percent: 2 },
+  { category: 'entertainment', percent: 2 },
+]
+
+const OFFERS: Offer[] = [
+  { id: 1, partner: 'Детский развлекательный центр', title: 'Скидка 20% на батуты', description: 'Для всей семьи по выходным', audience: 'family', points_cost: 300 },
+  { id: 2, partner: 'Книжный магазин', title: 'Скидка 10% на книги', description: 'Учебники и художественная литература', audience: 'child', points_cost: 150 },
+  { id: 3, partner: 'Спортивная секция', title: 'Пробное занятие бесплатно', description: 'Плавание, футбол, танцы', audience: 'child', points_cost: 200 },
+  { id: 4, partner: 'Медицинский центр', title: 'Скидка 15% на детского врача', description: 'Плановые осмотры и справки', audience: 'parent', points_cost: 500 },
+  { id: 5, partner: 'Онлайн-школа', title: 'Месяц курса со скидкой 25%', description: 'Программирование и английский', audience: 'family', points_cost: 400 },
+]
+
+const PERM_KEYS: PermissionKey[] = ['online_payments', 'goals', 'virtual_card', 'savings', 'partner_offers']
+const defaultPerms = (teen: boolean, online: boolean): Record<PermissionKey, boolean> =>
+  ({ online_payments: teen && online, goals: true, virtual_card: false, savings: false, partner_offers: true })
 
 // Пороги опыта: индекс = уровень-1
 const XP_STEPS = [0, 50, 120, 200, 320, 500]
@@ -47,9 +101,9 @@ const delay = <T,>(v: T) => new Promise<T>((r) => setTimeout(() => r(structuredC
 function seed(): DB {
   return {
     users: [
-      { id: 1, role: 'parent', name: 'Мама', family_id: 1, birth_date: '1988-04-10', xp: 0 },
-      { id: 2, role: 'child', name: 'Миша', family_id: 1, birth_date: '2016-03-02', xp: 100 },
-      { id: 3, role: 'child', name: 'Аня', family_id: 1, birth_date: '2011-06-20', xp: 260 },
+      { id: 1, role: 'parent', name: 'Мама', family_id: 1, birth_date: '1988-04-10', xp: 0, points: 1250 },
+      { id: 2, role: 'child', name: 'Миша', family_id: 1, birth_date: '2016-03-02', xp: 100, points: 340 },
+      { id: 3, role: 'child', name: 'Аня', family_id: 1, birth_date: '2011-06-20', xp: 260, points: 820 },
     ],
     accounts: [
       { id: 10, owner_id: 2, last4: '4412', balance_cents: 1250, status: 'active' },
@@ -72,6 +126,7 @@ function seed(): DB {
       { id: 3, account_id: 10, amount_cents: 120, direction: 'out', category: 'transport', merchant: 'Автобус', status: 'approved', decline_reason: null, created_at: minutesAgo(60 * 24) },
       { id: 4, account_id: 10, amount_cents: 1500, direction: 'out', category: 'games', merchant: 'Игровой магазин', status: 'declined', decline_reason: 'category_blocked', created_at: minutesAgo(60 * 5) },
       { id: 5, account_id: 11, amount_cents: 500, direction: 'out', category: 'food', merchant: 'Кофейня', status: 'approved', decline_reason: null, created_at: minutesAgo(60 * 3) },
+      { id: 6, account_id: 11, amount_cents: 2500, direction: 'out', category: 'shopping', merchant: 'Магазин одежды', status: 'pending', decline_reason: null, created_at: minutesAgo(40) },
     ],
     requests: [
       { id: 1, child_id: 2, child_name: 'Миша', type: 'money', amount_cents: 500, category: null, comment: 'На экскурсию', status: 'pending', created_at: minutesAgo(20) },
@@ -83,9 +138,11 @@ function seed(): DB {
       { id: 1, assigned_to: 2, title: 'Убрать в комнате', reward_cents: 200, xp_reward: 30, status: 'new', due_date: null },
       { id: 2, assigned_to: 2, title: 'Вынести мусор', reward_cents: 100, xp_reward: 15, status: 'done', due_date: null },
     ],
-    online: { 2: false, 3: true },
+    perms: { 2: defaultPerms(false, false), 3: { ...defaultPerms(true, true), savings: true } },
+    allowance: { 2: { amount_cents: 1000, period: 'week', active: true }, 3: { amount_cents: 2000, period: 'week', active: true } },
+    lessonsDone: { 3: [1, 3] },
     accepted: {},
-    seq: { tx: 5, req: 1, goal: 1, task: 2, user: 3, acc: 11 },
+    seq: { tx: 6, req: 1, goal: 1, task: 2, user: 3, acc: 11 },
   }
 }
 
@@ -133,6 +190,28 @@ export function mockApi(): Api {
     return m
   }
 
+  const isTeen = (u: UserRow) => ageFrom(u.birth_date) >= 14
+  const perm = (childId: number, key: PermissionKey) => !!db.perms[childId]?.[key]
+  const permList = (childId: number): Permission[] => {
+    const teen = isTeen(user(childId))
+    return PERM_KEYS.map((key) => ({
+      key, enabled: perm(childId, key),
+      locked_reason: key === 'online_payments' && !teen ? 'Доступно с 14 лет' : null,
+    }))
+  }
+  // Следующая выплата карманных: завтра или ближайший понедельник
+  const nextAllowanceDate = (period: 'day' | 'week') => {
+    const d = new Date(); d.setDate(d.getDate() + 1)
+    if (period === 'week') while (d.getDay() !== 1) d.setDate(d.getDate() + 1)
+    return d.toISOString().slice(0, 10)
+  }
+  const cashbackFor = (category: Category | null, amount: number) => {
+    const c = CASHBACK.find((x) => x.category === category)
+    return c ? Math.floor((amount * c.percent) / 100) : 0
+  }
+  const addTx = (accountId: number, amount: number, merchant: string) =>
+    db.txs.push({ id: ++db.seq.tx, account_id: accountId, amount_cents: amount, direction: 'in', category: null, merchant, status: 'approved', decline_reason: null, created_at: new Date().toISOString() })
+
   const levelOf = (xp: number) => XP_STEPS.reduce((lvl, step, i) => (xp >= step ? i + 1 : lvl), 1)
   const xpToNext = (xp: number) => {
     const l = levelOf(xp)
@@ -172,7 +251,7 @@ export function mockApi(): Api {
     if (catBlocked) {
       return { status: 'declined', reason: 'category_blocked', text: category === 'adult18' ? 'Категория 18+ запрещена банком' : `Родитель запретил категорию «${CATEGORY_LABEL[category]}»` }
     }
-    if (online && !db.online[childId]) return { status: 'declined', reason: 'online_not_allowed', text: 'Онлайн-покупки пока недоступны' }
+    if (online && !perm(childId, 'online_payments')) return { status: 'declined', reason: 'online_not_allowed', text: 'Онлайн-покупки пока недоступны' }
     if (a.balance_cents < amount) return { status: 'declined', reason: 'insufficient_funds', text: 'На карте не хватает денег' }
     const gl = generalLimit(childId)
     if (gl && spentToday(a.id) + amount > gl.amount_cents) return { status: 'declined', reason: 'limit_exceeded', text: 'Превышен дневной лимит' }
@@ -212,13 +291,14 @@ export function mockApi(): Api {
       if (age < 7 || age > 17) throw new MockError('validation_error', 'Пакет выпускается для детей 7–17 лет')
       const id = ++db.seq.user
       const accId = ++db.seq.acc
-      db.users.push({ id, role: 'child', name: req.child_name.trim(), family_id: p.family_id, birth_date: req.child_birth_date, xp: 0 })
+      db.users.push({ id, role: 'child', name: req.child_name.trim(), family_id: p.family_id, birth_date: req.child_birth_date, xp: 0, points: 0 })
       db.accounts.push({ id: accId, owner_id: id, last4: String(1000 + Math.floor(Math.random() * 9000)), balance_cents: 0, status: 'active' })
       db.limits[id] = [
         { category: null, period: 'day', amount_cents: 1000, is_blocked: false },
         { category: 'games', period: 'day', amount_cents: 0, is_blocked: true },
       ]
-      db.online[id] = age >= 14 && req.consents.includes('online_payments')
+      db.perms[id] = defaultPerms(age >= 14, req.consents.includes('online_payments'))
+      db.allowance[id] = { amount_cents: 0, period: 'week', active: false }
       return delay({ child_id: id, card_id: accId, age_group: age >= 14 ? '14-17' : '7-13', consents: req.consents })
     },
 
@@ -232,7 +312,7 @@ export function mockApi(): Api {
         card: { id: a.id, last4: a.last4, balance_cents: a.balance_cents, status: a.status },
         limits_today: { limit_cents: gl ? gl.amount_cents : null, spent_cents: spent, left_cents: gl ? Math.max(0, gl.amount_cents - spent) : null },
         level: { level: levelOf(c.xp), xp: c.xp, xp_to_next: xpToNext(c.xp) },
-        permissions: { online_payments: !!db.online[id] },
+        permissions: { online_payments: perm(id, 'online_payments') },
       })
     },
 
@@ -262,7 +342,7 @@ export function mockApi(): Api {
       const a = cardById(req.card_id)
       if (a.owner_id !== c.id) throw new MockError('forbidden', 'Это не ваша карта')
       const d = decide(c.id, a, req.amount_cents, req.category, req.is_online)
-      if (d.status === 'approved') a.balance_cents -= req.amount_cents
+      if (d.status === 'approved') { a.balance_cents -= req.amount_cents; c.points += cashbackFor(req.category, req.amount_cents) }
       const id = ++db.seq.tx
       db.txs.push({ id, account_id: a.id, amount_cents: req.amount_cents, direction: 'out', category: req.category, merchant: req.merchant, status: d.status, decline_reason: d.reason, created_at: new Date().toISOString() })
       const res: PayResult = { transaction_id: id, status: d.status, decline_reason: d.reason, balance_cents: a.balance_cents, message: d.text }
@@ -281,7 +361,7 @@ export function mockApi(): Api {
       const c = requireChild()
       const row: ReqRow = {
         id: ++db.seq.req, child_id: c.id, child_name: c.name, type: req.type,
-        amount_cents: req.amount_cents ?? null, category: req.category ?? null,
+        amount_cents: req.amount_cents ?? null, category: req.category ?? null, permission: req.permission ?? null,
         comment: req.comment, status: 'pending', created_at: new Date().toISOString(),
       }
       db.requests.push(row)
@@ -313,6 +393,10 @@ export function mockApi(): Api {
         const g = list.find((l) => l.category === null && l.period === 'day')
         if (g) g.amount_cents = r.amount_cents
         else list.push({ category: null, period: 'day', amount_cents: r.amount_cents, is_blocked: false })
+      } else if (r.type === 'product_access' && r.permission) {
+        const locked = permList(r.child_id).find((x) => x.key === r.permission)?.locked_reason
+        if (locked) throw new MockError('forbidden', `Нельзя включить: ${locked.toLowerCase()}`)
+        db.perms[r.child_id] = { ...db.perms[r.child_id], [r.permission]: true }
       } else if (r.type === 'category_unlock' && r.category && r.category !== 'adult18') {
         db.limits[r.child_id] = (db.limits[r.child_id] ?? []).filter((l) => l.category !== r.category)
       }
@@ -331,6 +415,7 @@ export function mockApi(): Api {
 
     async createGoal(title, target) {
       const c = requireChild()
+      if (!perm(c.id, 'goals')) throw new MockError('forbidden', 'Цели выключены родителем — попроси доступ')
       if (!title.trim() || !(target > 0)) throw new MockError('validation_error', 'Укажите название и сумму цели')
       const g = { id: ++db.seq.goal, child_id: c.id, title: title.trim(), target_cents: target, saved_cents: 0, parent_bonus_percent: 0, status: 'active' as const }
       db.goals.push(g)
@@ -437,6 +522,137 @@ export function mockApi(): Api {
     },
 
     async demoReset() { db = seed(); return delay({ status: 'ok' }) },
+
+    // ───────── Подтверждение покупок ─────────
+    async listPendingPurchases() {
+      const m = me()
+      const items = db.txs
+        .filter((t) => t.status === 'pending' && t.direction === 'out')
+        .map((t) => ({ t, owner: user(db.accounts.find((a) => a.id === t.account_id)!.owner_id) }))
+        .filter(({ owner }) => (m.role === 'parent' ? owner.family_id === m.family_id : owner.id === m.id))
+        .sort((x, y) => y.t.created_at.localeCompare(x.t.created_at))
+        .map(({ t, owner }) => { const { account_id: _a, ...rest } = t; return { ...rest, child_id: owner.id, child_name: owner.name } })
+      return delay({ items })
+    },
+
+    async approvePurchase(id) {
+      requireParent()
+      const t = db.txs.find((x) => x.id === id)
+      if (!t) throw new MockError('not_found', 'Операция не найдена')
+      const a = cardById(t.account_id)
+      const child = access(a.owner_id)
+      if (t.status !== 'pending') throw new MockError('conflict', 'Операция уже обработана')
+      // На момент подтверждения деньги могли закончиться или карту заблокировали
+      if (a.status === 'blocked') { t.status = 'declined'; t.decline_reason = 'card_blocked'; return delay({ id, status: t.status, balance_cents: a.balance_cents, message: 'Карта заблокирована, покупка отклонена' }) }
+      if (a.balance_cents < t.amount_cents) { t.status = 'declined'; t.decline_reason = 'insufficient_funds'; return delay({ id, status: t.status, balance_cents: a.balance_cents, message: 'На карте не хватает денег, покупка отклонена' }) }
+      a.balance_cents -= t.amount_cents
+      child.points += cashbackFor(t.category, t.amount_cents)
+      t.status = 'approved'
+      return delay({ id, status: t.status, balance_cents: a.balance_cents, message: 'Покупка подтверждена' })
+    },
+
+    async declinePurchase(id) {
+      requireParent()
+      const t = db.txs.find((x) => x.id === id)
+      if (!t) throw new MockError('not_found', 'Операция не найдена')
+      const a = cardById(t.account_id)
+      access(a.owner_id)
+      if (t.status !== 'pending') throw new MockError('conflict', 'Операция уже обработана')
+      t.status = 'declined'
+      return delay({ id, status: t.status, balance_cents: a.balance_cents, message: 'Покупка отклонена родителем' })
+    },
+
+    // ───────── Карманные деньги ─────────
+    async getAllowance(childId) {
+      access(childId)
+      const al = db.allowance[childId] ?? { amount_cents: 0, period: 'week' as const, active: false }
+      return delay({ ...al, next_date: al.active ? nextAllowanceDate(al.period) : null })
+    },
+
+    async putAllowance(childId, a) {
+      requireParent(); access(childId)
+      if (a.active && !(a.amount_cents > 0)) throw new MockError('validation_error', 'Укажите сумму карманных денег')
+      db.allowance[childId] = { amount_cents: a.amount_cents, period: a.period, active: a.active }
+      return delay({ ...db.allowance[childId], next_date: a.active ? nextAllowanceDate(a.period) : null })
+    },
+
+    async payAllowance(childId) {
+      requireParent(); access(childId)
+      const al = db.allowance[childId]
+      if (!al || !al.active || !(al.amount_cents > 0)) throw new MockError('validation_error', 'Карманные деньги не настроены')
+      const a = card(childId)
+      a.balance_cents += al.amount_cents
+      addTx(a.id, al.amount_cents, 'Карманные деньги')
+      return delay({ balance_cents: a.balance_cents })
+    },
+
+    // ───────── Права ребёнка ─────────
+    async getPermissions(childId) { access(childId); return delay({ items: permList(childId) }) },
+
+    async putPermissions(childId, items) {
+      requireParent(); access(childId)
+      const cur = permList(childId)
+      for (const it of items) {
+        const lock = cur.find((x) => x.key === it.key)?.locked_reason
+        if (it.enabled && lock) throw new MockError('forbidden', `Нельзя включить: ${lock.toLowerCase()}`)
+      }
+      db.perms[childId] = { ...db.perms[childId], ...Object.fromEntries(items.map((i) => [i.key, i.enabled])) }
+      return delay({ items: permList(childId) })
+    },
+
+    // ───────── Уроки ─────────
+    async getLessons(childId) {
+      const m = me()
+      const cid = m.role === 'child' ? m.id : childId
+      if (!cid) throw new MockError('validation_error', 'Укажите ребёнка')
+      access(cid)
+      const done = db.lessonsDone[cid] ?? []
+      return delay({ items: LESSONS.map(({ answer: _a, explanation: _e, ...l }) => ({ ...l, completed: done.includes(l.id) })) })
+    },
+
+    async answerLesson(lessonId, optionIndex) {
+      const c = requireChild()
+      const l = LESSONS.find((x) => x.id === lessonId)
+      if (!l) throw new MockError('not_found', 'Урок не найден')
+      const done = db.lessonsDone[c.id] ?? (db.lessonsDone[c.id] = [])
+      const correct = optionIndex === l.answer
+      // Награда начисляется один раз — за первый правильный ответ
+      if (correct && !done.includes(l.id)) {
+        done.push(l.id)
+        c.xp += l.xp_reward
+        c.points += l.points_reward
+      }
+      return delay({ correct, explanation: correct ? l.explanation : 'Не совсем. Перечитай урок и попробуй ещё раз.', xp: c.xp, level: levelOf(c.xp), points: c.points })
+    },
+
+    // ───────── Лояльность ─────────
+    async getLoyalty(childId) {
+      const m = me()
+      const target = m.role === 'parent' && childId ? access(childId) : m
+      const audience = target.role === 'parent' ? ['parent', 'family'] : ['child', 'family']
+      const offersOn = target.role === 'parent' || perm(target.id, 'partner_offers')
+      return delay({ points: target.points, cashback: CASHBACK, offers: offersOn ? OFFERS.filter((o) => audience.includes(o.audience)) : [] })
+    },
+
+    async redeemOffer(offerId) {
+      const m = me()
+      const o = OFFERS.find((x) => x.id === offerId)
+      if (!o) throw new MockError('not_found', 'Предложение не найдено')
+      if (m.role === 'child' && !perm(m.id, 'partner_offers')) throw new MockError('forbidden', 'Предложения партнёров выключены родителем')
+      if (m.points < o.points_cost) throw new MockError('validation_error', 'Не хватает баллов')
+      m.points -= o.points_cost
+      return delay({ points: m.points, code: `MT-${o.id}${Math.floor(1000 + Math.random() * 9000)}` })
+    },
+
+    // ───────── Потеря карты ─────────
+    async reissueCard(cardId) {
+      requireParent()
+      const a = cardById(cardId)
+      access(a.owner_id)
+      a.last4 = String(1000 + Math.floor(Math.random() * 9000))
+      a.status = 'active'
+      return delay({ id: a.id, last4: a.last4, status: a.status })
+    },
   }
 
   return api

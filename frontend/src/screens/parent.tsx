@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { api } from '../api'
-import { CATEGORY_ICON, CATEGORY_LABEL, REQ_SHORT, ageFrom, ageLabel, dateTime, money, plural, toCents } from '../format'
+import { CATEGORY_ICON, CATEGORY_LABEL, PERMISSION_INFO, REQ_SHORT, ageFrom, ageLabel, dateShort, dateTime, money, plural, toCents } from '../format'
 import { useData } from '../hooks'
 import { Icon, type IconName } from '../icons'
 import { useNav } from '../nav'
@@ -9,7 +9,7 @@ import {
   FloatAction, Row, Section, Segmented, Sheet, Toggle, toast,
 } from '../ui'
 import type { Category, ChildDetail, ConsentType, LimitItem } from '../types'
-import { GoalCard, REQ_ICON, TaskHead, TxList, requestText } from './shared'
+import { GoalCard, REQ_ICON, TaskHead, TxList, TxRow, requestText } from './shared'
 
 const CATS: Category[] = ['food', 'transport', 'education', 'shopping', 'entertainment', 'games', 'subscriptions', 'adult18']
 
@@ -17,18 +17,24 @@ const CATS: Category[] = ['food', 'transport', 'education', 'shopping', 'enterta
 export function ParentHome() {
   const { push, setTab } = useNav()
   const { data, reload } = useData(() => api.getFamily(), [], 3000)
+  const pp = useData(() => api.listPendingPurchases(), [], 3000)
   if (!data) return <><Header title="Семья" /><Loading /></>
   const pending = data.children.reduce((s, c) => s + c.pending_requests, 0)
+  const purchases = pp.data?.items.length ?? 0
+  const waiting = [
+    pending ? `${pending} ${plural(pending, 'запрос', 'запроса', 'запросов')}` : '',
+    purchases ? `${purchases} ${plural(purchases, 'покупка', 'покупки', 'покупок')}` : '',
+  ].filter(Boolean).join(' и ')
   const total = data.children.reduce((s, c) => s + c.card.balance_cents, 0)
   return (
     <>
       <Header title={data.family.name} subtitle="Семейный банкинг" right={<Avatar name="Мама" light size={38} />} />
       <div className="space-y-5 p-4">
-        {pending > 0 && (
+        {waiting && (
           <Card onClick={() => setTab('requests')} className="flex items-center gap-3">
             <IconTile name="bell" tone="red" />
             <div className="min-w-0 flex-1">
-              <div className="text-[15px] font-semibold text-mt-ink">{pending} {plural(pending, 'запрос', 'запроса', 'запросов')} от детей</div>
+              <div className="text-[15px] font-semibold text-mt-ink">{waiting}</div>
               <div className="text-[13px] text-muted">Ждут вашего решения</div>
             </div>
             <Icon name="chevron-right" size={20} className="text-[#9AA6B8]" />
@@ -60,11 +66,30 @@ export function ParentHome() {
           ))}
         </Section>
 
+        <FamilyFeed kids={data.children} />
+
         <button onClick={async () => { await api.demoReset(); await reload(); toast('Демо-данные сброшены') }} className="mx-auto flex items-center gap-1.5 py-2 text-xs font-medium text-muted">
           <Icon name="refresh" size={14} />Сбросить демо-данные
         </button>
       </div>
     </>
+  )
+}
+
+// Лента событий: последние операции всех детей (п. 3.1 ТЗ — «получает уведомления»)
+function FamilyFeed({ kids }: { kids: { id: number; name: string }[] }) {
+  const ids = kids.map((k) => k.id).join(',')
+  const { data } = useData(async () => {
+    const lists = await Promise.all(kids.map(async (k) => (await api.getTransactions(k.id, 4)).items.map((t) => ({ ...t, who: k.name }))))
+    return lists.flat().sort((a, b) => Date.parse(b.created_at) - Date.parse(a.created_at)).slice(0, 5)
+  }, [ids], 4000)
+  if (!data || !data.length) return null
+  return (
+    <Section title="Последние события">
+      <Card className="px-4 py-1">
+        <div className="divide-y divide-line">{data.map((t) => <TxRow key={`${t.who}-${t.id}`} t={t} who={t.who} />)}</div>
+      </Card>
+    </Section>
   )
 }
 
@@ -96,6 +121,10 @@ export function ParentProducts() {
           <Row plain icon="tasks" title="Задания с наградой" sub="Поручения, за которые ребёнок получает деньги" onClick={() => setTab('tasks')} />
           <div className="mx-4 my-1 h-px bg-line" />
           <Row plain icon="shield" title="Детский пакет" sub="Карта и вход в Moby для ребёнка 7–17 лет" onClick={() => push({ name: 'package' })} />
+          <Row plain icon="gift" title="Бонусы и партнёры" sub="Баллы за покупки, скидки для семьи" onClick={() => push({ name: 'loyalty' })} />
+          <div className="mx-4 my-1 h-px bg-line" />
+          <Row plain icon="wallet" title="Детский вклад" sub="Накопления на учёбу и крупные цели" right={<Badge tone="gray">Скоро</Badge>} />
+          <Row plain icon="heart" title="Страхование ребёнка" sub="Спорт, путешествия, здоровье" right={<Badge tone="gray">Скоро</Badge>} />
         </Card>
       </div>
       <FloatAction icon="card-plus" label="Оформить" onClick={() => push({ name: 'package' })} />
@@ -197,7 +226,7 @@ export function PackageFlow() {
 }
 
 // ───────── Управление ребёнком ─────────
-type Pane = 'limits' | 'ops' | 'goals'
+type Pane = 'limits' | 'settings' | 'ops' | 'progress'
 
 export function ChildManage({ id }: { id: number }) {
   const { back } = useNav()
@@ -224,13 +253,14 @@ export function ChildManage({ id }: { id: number }) {
         </div>
 
         <Segmented<Pane>
-          options={[{ id: 'limits', label: 'Лимиты' }, { id: 'ops', label: 'Операции' }, { id: 'goals', label: 'Цели' }]}
+          options={[{ id: 'limits', label: 'Лимиты' }, { id: 'settings', label: 'Права' }, { id: 'ops', label: 'История' }, { id: 'progress', label: 'Успехи' }]}
           value={pane} onChange={setPane}
         />
 
         {pane === 'limits' && <LimitsEditor childId={id} onSaved={reload} />}
         {pane === 'ops' && <TxList key={txKey + c.card.balance_cents} childId={id} limit={15} />}
-        {pane === 'goals' && <><LevelCard level={c.level} /><GoalsParent childId={id} /></>}
+        {pane === 'settings' && <><AllowanceCard childId={id} onPaid={reload} /><PermissionsCard childId={id} /><SecurityCard cardId={c.card.id} onDone={reload} /></>}
+        {pane === 'progress' && <><LevelCard level={c.level} /><PointsCard childId={id} /><LessonsProgress childId={id} /><GoalsParent childId={id} /></>}
       </div>
 
       <Sheet open={topup} onClose={() => setTopup(false)} title={`Пополнить карту ${c.name}`}>
@@ -314,6 +344,156 @@ function LimitsEditor({ childId, onSaved }: { childId: number; onSaved: () => vo
   )
 }
 
+// Карманные деньги: регулярный перевод от родителя (п. 4.1 ТЗ)
+function AllowanceCard({ childId, onPaid }: { childId: number; onPaid: () => void }) {
+  const { data, reload } = useData(() => api.getAllowance(childId), [childId])
+  const [amount, setAmount] = useState('')
+  const [period, setPeriod] = useState<'day' | 'week'>('week')
+  const [active, setActive] = useState(false)
+  useEffect(() => {
+    if (!data) return
+    setAmount(data.amount_cents ? String(data.amount_cents / 100) : '')
+    setPeriod(data.period)
+    setActive(data.active)
+  }, [data])
+  if (!data) return <Loading />
+  return (
+    <Card className="space-y-4">
+      <div className="flex items-center gap-3">
+        <IconTile name="calendar" />
+        <div className="min-w-0 flex-1">
+          <div className="text-[15px] font-semibold text-mt-ink">Карманные деньги</div>
+          <div className="text-[13px] text-muted">
+            {data.active && data.next_date ? `${money(data.amount_cents)} · следующий перевод ${dateShort(data.next_date)}` : 'Регулярный перевод выключен'}
+          </div>
+        </div>
+        <Toggle on={active} onChange={setActive} />
+      </div>
+      {active && (
+        <>
+          <Field label="Сумма перевода" inputMode="decimal" value={amount} onChange={setAmount} placeholder="0" suffix="BYN" />
+          <Segmented<'day' | 'week'> options={[{ id: 'day', label: 'Каждый день' }, { id: 'week', label: 'Каждую неделю' }]} value={period} onChange={setPeriod} />
+        </>
+      )}
+      <div className="grid grid-cols-2 gap-2">
+        <Btn small tone="secondary" onClick={async () => {
+          const cents = active ? toCents(amount) : data.amount_cents
+          if (active && !(cents > 0)) { toast('Укажите сумму'); return }
+          await api.putAllowance(childId, { amount_cents: cents, period, active })
+          await reload()
+          toast(active ? 'Карманные деньги настроены' : 'Регулярный перевод выключен')
+        }}>Сохранить</Btn>
+        <Btn small disabled={!data.active} onClick={async () => {
+          await api.payAllowance(childId)
+          onPaid()
+          toast(`Перевели ${money(data.amount_cents)}`)
+        }}>Выплатить</Btn>
+      </div>
+    </Card>
+  )
+}
+
+// Права ребёнка в Moby: продукты, функционал, операции (п. 2 и 3.1 ТЗ)
+function PermissionsCard({ childId }: { childId: number }) {
+  const { data, reload } = useData(() => api.getPermissions(childId), [childId], 3000)
+  if (!data) return <Loading />
+  return (
+    <Section title="Права в Moby">
+      <Card className="divide-y divide-line p-0">
+        {data.items.map((p) => {
+          const info = PERMISSION_INFO[p.key]
+          return (
+            <div key={p.key} className="flex items-center gap-3 px-4 py-3">
+              <IconTile name={info.icon} tone={p.enabled ? 'blue' : 'gray'} size={36} />
+              <div className="min-w-0 flex-1">
+                <div className="text-[15px] font-medium text-mt-ink">{info.title}</div>
+                <div className={`text-[13px] ${p.locked_reason ? 'text-mt-red' : 'text-muted'}`}>{p.locked_reason ?? info.sub}</div>
+              </div>
+              {p.locked_reason
+                ? <Icon name="lock" size={20} className="mr-3 text-[#A3ABB8]" />
+                : <Toggle on={p.enabled} onChange={async (v) => {
+                    try {
+                      await api.putPermissions(childId, [{ key: p.key, enabled: v }])
+                      await reload()
+                      toast(`${info.title}: ${v ? 'разрешено' : 'запрещено'}`)
+                    } catch (e) { toast((e as Error).message) }
+                  }} />}
+            </div>
+          )
+        })}
+      </Card>
+    </Section>
+  )
+}
+
+// Безопасность: потеря карты (п. 4.1 ТЗ)
+function SecurityCard({ cardId, onDone }: { cardId: number; onDone: () => void }) {
+  const [open, setOpen] = useState(false)
+  return (
+    <>
+      <Section title="Безопасность">
+        <Card className="p-0 py-1">
+          <Row icon="alert" iconTone="red" title="Карта потеряна или украдена" sub="Заблокируем и перевыпустим" onClick={() => setOpen(true)} chevron />
+          <Row icon="shield" title="Защита от мошенников" sub="Покупки 18+ и азартные игры запрещены банком" />
+        </Card>
+      </Section>
+      <Sheet open={open} onClose={() => setOpen(false)} title="Карта потеряна?">
+        <div className="space-y-4">
+          <p className="text-[15px] text-muted">Старая карта сразу перестанет работать. Деньги останутся на счёте, а ребёнок получит новую карту.</p>
+          <Btn tone="accent" onClick={async () => {
+            const r = await api.reissueCard(cardId)
+            setOpen(false)
+            onDone()
+            toast(`Карта перевыпущена: •• ${r.last4}`)
+          }}>Заблокировать и перевыпустить</Btn>
+        </div>
+      </Sheet>
+    </>
+  )
+}
+
+function PointsCard({ childId }: { childId: number }) {
+  const { data } = useData(() => api.getLoyalty(childId), [childId], 4000)
+  if (!data) return null
+  return (
+    <Card className="flex items-center gap-3">
+      <IconTile name="coins" />
+      <div className="min-w-0 flex-1">
+        <div className="text-[15px] font-semibold text-mt-ink">Баллы лояльности</div>
+        <div className="text-[13px] text-muted">Кешбэк за покупки и награды за уроки</div>
+      </div>
+      <div className="text-lg font-bold tabular-nums text-mt-ink">{data.points.toLocaleString('ru-RU')}</div>
+    </Card>
+  )
+}
+
+// Прогресс по урокам финансовой грамотности (п. 4.1 ТЗ — «родитель видит прогресс»)
+function LessonsProgress({ childId }: { childId: number }) {
+  const { data } = useData(() => api.getLessons(childId), [childId], 4000)
+  if (!data) return null
+  const done = data.items.filter((l) => l.completed).length
+  return (
+    <Card>
+      <div className="flex items-center gap-3">
+        <IconTile name="book" />
+        <div className="min-w-0 flex-1">
+          <div className="text-[15px] font-semibold text-mt-ink">Уроки финансовой грамотности</div>
+          <div className="text-[13px] text-muted">Пройдено {done} из {data.items.length}</div>
+        </div>
+      </div>
+      <div className="mt-3"><Progress value={done} max={data.items.length} /></div>
+      <div className="mt-3 space-y-2">
+        {data.items.map((l) => (
+          <div key={l.id} className="flex items-center gap-2 text-sm">
+            <Icon name={l.completed ? 'check' : 'clock'} size={16} className={l.completed ? 'text-[#2F6FE4]' : 'text-[#A3ABB8]'} />
+            <span className={l.completed ? 'text-mt-ink' : 'text-muted'}>{l.title}</span>
+          </div>
+        ))}
+      </div>
+    </Card>
+  )
+}
+
 function LevelCard({ level }: { level: ChildDetail['level'] }) {
   const next = level.xp + level.xp_to_next
   return (
@@ -328,7 +508,7 @@ function LevelCard({ level }: { level: ChildDetail['level'] }) {
         </div>
       </div>
       {level.xp_to_next > 0 && <div className="mt-3"><Progress value={level.xp} max={next} tone="brand" /></div>}
-      <p className="mt-3 text-[13px] text-muted">Опыт начисляется за выполненные задания. Уровень мотивирует ребёнка, а лимиты и разрешения меняете только вы.</p>
+      <p className="mt-3 text-[13px] text-muted">Опыт начисляется за задания и уроки. Уровень мотивирует ребёнка, а лимиты и разрешения меняете только вы.</p>
     </Card>
   )
 }
@@ -356,14 +536,45 @@ function GoalsParent({ childId }: { childId: number }) {
 // ───────── Запросы ─────────
 export function ParentRequests() {
   const { data, reload } = useData(() => api.listRequests(), [], 3000)
+  const pp = useData(() => api.listPendingPurchases(), [], 3000)
   if (!data) return <><Header title="Запросы" /><Loading /></>
   const pending = data.items.filter((r) => r.status === 'pending')
   const done = data.items.filter((r) => r.status !== 'pending')
+  const purchases = pp.data?.items ?? []
+  const total = pending.length + purchases.length
   return (
     <>
-      <Header title="Запросы" subtitle={pending.length ? `${pending.length} ${plural(pending.length, 'ждёт', 'ждут', 'ждут')} решения` : 'Всё рассмотрено'} />
+      <Header title="Запросы" subtitle={total ? `${total} ${plural(total, 'ждёт', 'ждут', 'ждут')} решения` : 'Всё рассмотрено'} />
       <div className="space-y-5 p-4">
-        {!pending.length && <Empty text="Новых запросов нет" />}
+        {!total && <Empty text="Новых запросов нет" />}
+
+        {purchases.length > 0 && (
+          <Section title="Подтвердить покупку">
+            {purchases.map((t) => (
+              <Card key={t.id}>
+                <div className="flex items-center gap-3">
+                  <Avatar name={t.child_name} size={36} />
+                  <div className="min-w-0 flex-1">
+                    <div className="text-[15px] font-semibold text-mt-ink">{t.child_name}</div>
+                    <div className="text-xs text-muted">{dateTime(t.created_at)}</div>
+                  </div>
+                  <Badge tone="sky"><Icon name="globe" size={14} />Онлайн</Badge>
+                </div>
+                <div className="mt-3 flex items-baseline justify-between gap-3">
+                  <div className="min-w-0 truncate text-[17px] font-semibold text-mt-ink">{t.merchant}</div>
+                  <div className="shrink-0 text-xl font-bold tabular-nums text-mt-ink">{money(t.amount_cents)}</div>
+                </div>
+                <div className="text-[13px] text-muted">{t.category ? CATEGORY_LABEL[t.category] : 'Покупка'} · крупная покупка ждёт вашего решения</div>
+                <div className="mt-4 grid grid-cols-2 gap-2">
+                  <Btn small tone="danger" onClick={async () => { const r = await api.declinePurchase(t.id); await pp.reload(); toast(r.message) }}>Отклонить</Btn>
+                  <Btn small onClick={async () => { const r = await api.approvePurchase(t.id); await pp.reload(); toast(r.message) }}>Подтвердить</Btn>
+                </div>
+              </Card>
+            ))}
+          </Section>
+        )}
+
+        {pending.length > 0 && purchases.length > 0 && <h2 className="px-1 text-[22px] font-bold tracking-tight text-mt-ink">Запросы детей</h2>}
         {pending.map((r) => (
           <Card key={r.id}>
             <div className="flex items-center gap-3">
