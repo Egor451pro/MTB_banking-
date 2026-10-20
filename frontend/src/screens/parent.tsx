@@ -9,7 +9,7 @@ import {
   Row, Section, Segmented, Sheet, Toggle, toast,
 } from '../ui'
 import type { Category, ConsentType, LimitItem } from '../types'
-import { GoalCard, REQ_ICON, TaskHead, TxList, requestText } from './shared'
+import { GoalCard, REQ_ICON, TaskHead, TxList, TxRow, requestText } from './shared'
 import { beaverInfo, damSrc, logWord } from './beaver'
 
 // Какого ребёнка открыть во вкладке «Дети» (выбирают на главной или после оформления карты)
@@ -54,8 +54,27 @@ export function ParentHome({ onExit }: { onExit?: () => void }) {
             </Card>
           ))}
         </Section>
+
+        <FamilyFeed kids={data.children} />
       </div>
     </>
+  )
+}
+
+// Последние операции всех детей
+function FamilyFeed({ kids }: { kids: { id: number; name: string }[] }) {
+  const ids = kids.map((k) => k.id).join(',')
+  const { data } = useData(async () => {
+    const lists = await Promise.all(kids.map(async (k) => (await api.getTransactions(k.id, 4)).items.map((t) => ({ ...t, who: k.name }))))
+    return lists.flat().sort((a, b) => Date.parse(b.created_at) - Date.parse(a.created_at)).slice(0, 5)
+  }, [ids], 4000)
+  if (!data || !data.length) return null
+  return (
+    <Section title="Последние операции">
+      <Card className="px-4 py-1">
+        <div className="divide-y divide-line">{data.map((t) => <TxRow key={`${t.who}-${t.id}`} t={t} who={t.who} />)}</div>
+      </Card>
+    </Section>
   )
 }
 
