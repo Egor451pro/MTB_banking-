@@ -230,6 +230,17 @@ class AccessRequest(Base):
     child: Mapped["User"] = relationship("User", back_populates="access_requests")
 
 
+class Allowance(Base):
+    """Карманные деньги ребёнка"""
+    __tablename__ = "allowances"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    child_id: Mapped[int] = mapped_column(ForeignKey("users.id"), unique=True, nullable=False)
+    amount_cents: Mapped[int] = mapped_column(Integer, default=0)
+    period: Mapped[str] = mapped_column(String(10), default="week")  # day | week
+    active: Mapped[bool] = mapped_column(Boolean, default=False)
+
+
 class Lesson(Base):
     """Урок финансовой грамотности"""
     __tablename__ = "lessons"

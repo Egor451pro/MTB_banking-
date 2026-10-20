@@ -13,7 +13,7 @@ from app.models import (
     Family, User, UserRole, Account, AccountType, AccountStatus,
     Limit, LimitPeriod, Transaction, TransactionDirection, TransactionStatus,
     Consent, Goal, GoalStatus, Task, TaskStatus, AccessRequest, RequestStatus, RequestType,
-    Lesson, LessonProgress,
+    Allowance, Lesson, LessonProgress,
 )
 
 
@@ -30,6 +30,7 @@ async def clear_all_tables(session):
     await session.execute(delete(Transaction))
     await session.execute(delete(Limit))
     await session.execute(delete(Consent))
+    await session.execute(delete(Allowance))
     await session.execute(delete(Account))
     await session.execute(delete(User))
     await session.execute(delete(Family))
@@ -122,6 +123,11 @@ async def seed_data():
         session.add(Consent(child_id=anya.id, consent_type="savings"))
         session.add(Consent(child_id=anya.id, consent_type="partner_offers"))
         
+        # 3b. Карманные деньги: Миша 10 BYN/неделя, Аня 20 BYN/неделя
+        print("🪙 Создаём карманные деньги...")
+        session.add(Allowance(child_id=misha.id, amount_cents=1000, period="week", active=True))
+        session.add(Allowance(child_id=anya.id, amount_cents=2000, period="week", active=True))
+
         # 4. Создаем карты
         print("💳 Создаем карты...")
         
