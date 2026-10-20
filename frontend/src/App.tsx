@@ -112,14 +112,10 @@ export default function App() {
       </div>
       <div className="relative flex h-[calc(100dvh-52px)] w-full flex-col overflow-hidden bg-[#EDEFF3] sm:h-[min(820px,calc(100dvh-90px))] sm:max-w-[400px] sm:rounded-[36px] sm:border-[7px] sm:border-mt-ink sm:shadow-2xl">
         <ToastHost />
-<<<<<<< HEAD
         <BonusBannerHost />
-        <Phone key={uid} uid={uid} />
-=======
         {user
           ? <Phone key={user.id} uid={user.id} />
           : <div className="flex-1 overflow-y-auto"><LoginScreen onSuccess={setUser} /></div>}
->>>>>>> feature/backCursor
       </div>
     </div>
   )
