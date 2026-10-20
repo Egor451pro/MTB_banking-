@@ -12,7 +12,8 @@ from app.db import AsyncSessionLocal, init_db
 from app.models import (
     Family, User, UserRole, Account, AccountType, AccountStatus,
     Limit, LimitPeriod, Transaction, TransactionDirection, TransactionStatus,
-    Consent, Goal, GoalStatus, Task, TaskStatus, AccessRequest, RequestStatus, RequestType
+    Consent, Goal, GoalStatus, Task, TaskStatus, AccessRequest, RequestStatus, RequestType,
+    Lesson, LessonProgress,
 )
 
 
@@ -372,7 +373,4 @@ async def seed_data():
 
 
 if __name__ == "__main__":
-    # Импорт моделей для предотвращения проблем с circular imports
-    from app.models import LessonProgress, Lesson
-    
     asyncio.run(seed_data())
