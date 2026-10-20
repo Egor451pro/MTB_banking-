@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, type ReactNode } from 'react'
 import { api, session, usingMock, type LoginResult } from './api'
 import { NavProvider, useNav } from './nav'
 import { BottomNav, ToastHost, Loading, type TabDef } from './ui'
@@ -75,8 +75,92 @@ function Phone({ uid }: { uid: number }) {
   if (!me) return <Loading />
   return (
     <NavProvider initialTab="home">
-      {me.role === 'parent' ? <ParentShell /> : <ChildShell me={me} />}
+      <div className="flex h-full min-h-0 flex-1 flex-col">
+        {me.role === 'parent' ? <ParentShell /> : <ChildShell me={me} />}
+      </div>
     </NavProvider>
+  )
+}
+
+function formatStatusTime() {
+  const d = new Date()
+  return `${d.getHours()}:${String(d.getMinutes()).padStart(2, '0')}`
+}
+
+/** Рамка iPhone 17: тонкий титановый безель, Dynamic Island, живое время */
+function IPhoneFrame({ children }: { children: ReactNode }) {
+  const [time, setTime] = useState(formatStatusTime)
+  useEffect(() => {
+    const tick = () => setTime(formatStatusTime())
+    tick()
+    // синхронизация к началу минуты, дальше — каждую минуту
+    const msToNextMinute = 60_000 - (Date.now() % 60_000) + 50
+    let intervalId: ReturnType<typeof setInterval> | undefined
+    const timeoutId = setTimeout(() => {
+      tick()
+      intervalId = setInterval(tick, 60_000)
+    }, msToNextMinute)
+    return () => {
+      clearTimeout(timeoutId)
+      if (intervalId) clearInterval(intervalId)
+    }
+  }, [])
+
+  return (
+    <div
+      className="iphone-frame relative flex h-[calc(100dvh-44px)] w-full flex-col overflow-hidden bg-[#F2F2F7]
+        sm:h-[min(852px,calc(100dvh-88px))] sm:w-[393px] sm:max-w-[393px]
+        sm:rounded-[46px] sm:p-[3.5px]
+        sm:bg-[linear-gradient(160deg,#4a4a4c_0%,#2a2a2c_18%,#111113_50%,#1f1f21_78%,#3d3d3f_100%)]
+        sm:shadow-[0_0_0_0.5px_rgba(255,255,255,0.18),0_30px_80px_-20px_rgba(0,0,0,0.6),0_10px_28px_-10px_rgba(0,0,0,0.4)]"
+    >
+      {/* Боковые кнопки */}
+      <div className="pointer-events-none absolute -left-[2.5px] top-[100px] hidden h-[30px] w-[2.5px] rounded-l-[1.5px] bg-[#3a3a3c] sm:block" />
+      <div className="pointer-events-none absolute -left-[2.5px] top-[158px] hidden h-[54px] w-[2.5px] rounded-l-[1.5px] bg-[#3a3a3c] sm:block" />
+      <div className="pointer-events-none absolute -left-[2.5px] top-[224px] hidden h-[54px] w-[2.5px] rounded-l-[1.5px] bg-[#3a3a3c] sm:block" />
+      <div className="pointer-events-none absolute -right-[2.5px] top-[190px] hidden h-[70px] w-[2.5px] rounded-r-[1.5px] bg-[#3a3a3c] sm:block" />
+
+      {/* Экран — контент под Dynamic Island, как на настоящем iOS */}
+      <div className="relative flex min-h-0 flex-1 flex-col overflow-hidden bg-[#F2F2F7] sm:rounded-[42.5px]">
+        {/* Статус-бар + Dynamic Island (оверлей) */}
+        <div className="pointer-events-none absolute inset-x-0 top-0 z-30 flex h-[54px] items-end justify-between px-[28px] pb-[11px] text-[15px] font-semibold tracking-[-0.03em] text-white">
+          <span key={time} className="status-time min-w-[54px] pl-0.5 tabular-nums leading-none drop-shadow-sm">{time}</span>
+
+          <div className="dynamic-island absolute left-1/2 top-[12px] h-[37px] w-[126px] -translate-x-1/2 rounded-full bg-black shadow-[inset_0_0_0_1px_rgba(255,255,255,0.1),0_1px_6px_rgba(0,0,0,0.45)]">
+            <div className="dynamic-island-activity absolute left-[18px] top-1/2 h-[8px] w-[8px] -translate-y-1/2 rounded-full bg-[#30D158]" />
+            <div className="absolute right-[16px] top-1/2 h-[12px] w-[12px] -translate-y-1/2 rounded-full bg-[#0a0a0c] shadow-[inset_0_0_0_1.5px_#1a1a1c]">
+              <div className="absolute left-1/2 top-1/2 h-[4.5px] w-[4.5px] -translate-x-1/2 -translate-y-1/2 rounded-full bg-[#152033]" />
+            </div>
+          </div>
+
+          <div className="flex items-center justify-end gap-[6px] drop-shadow-sm">
+            <svg width="19" height="12" viewBox="0 0 19 12" fill="currentColor" aria-hidden>
+              <rect x="0" y="8" width="3.2" height="4" rx="0.7" />
+              <rect x="4.8" y="5.5" width="3.2" height="6.5" rx="0.7" />
+              <rect x="9.6" y="3" width="3.2" height="9" rx="0.7" />
+              <rect x="14.4" y="0.5" width="3.2" height="11.5" rx="0.7" />
+            </svg>
+            <svg width="17" height="12" viewBox="0 0 17 12" fill="currentColor" aria-hidden>
+              <path d="M8.5 2c2.3 0 4.3 1 5.7 2.55l-1.4 1.35A5.6 5.6 0 0 0 8.5 4.3c-1.7 0-3.15.7-4.2 1.8L2.85 4.75A7.4 7.4 0 0 1 8.5 2Zm0 3.5c1.3 0 2.4.5 3.25 1.45L10.4 8.3A2.8 2.8 0 0 0 8.5 7.6c-.8 0-1.55.3-2.1.85L5.1 7.1A4.5 4.5 0 0 1 8.5 5.5Zm0 3.55c.7 0 1.25.55 1.25 1.25S9.2 11.55 8.5 11.55 7.25 11 7.25 10.3 7.8 9.05 8.5 9.05Z" />
+            </svg>
+            <svg width="27" height="13" viewBox="0 0 27 13" aria-hidden>
+              <rect x="0.55" y="0.55" width="22" height="11.9" rx="3.4" stroke="currentColor" strokeOpacity="0.55" fill="none" strokeWidth="1.1" />
+              <rect x="2" y="2" width="17.5" height="9" rx="2.1" fill="currentColor" />
+              <path d="M24.3 4.1v4.8a2 2 0 0 0 0-4.8Z" fill="currentColor" opacity="0.5" />
+            </svg>
+          </div>
+        </div>
+
+        <div className="relative flex min-h-0 flex-1 flex-col overflow-hidden">
+          {children}
+        </div>
+
+        {/* Home indicator */}
+        <div className="pointer-events-none absolute inset-x-0 bottom-[8px] z-30 flex justify-center">
+          <div className="h-[5px] w-[134px] rounded-full bg-black/90" />
+        </div>
+      </div>
+    </div>
   )
 }
 
@@ -104,12 +188,12 @@ export default function App() {
           <span className="text-[13px] font-medium text-muted">Вход в Moby</span>
         )}
       </div>
-      <div className="relative flex h-[calc(100dvh-44px)] w-full flex-col overflow-hidden bg-[#EDEFF3] sm:h-[min(820px,calc(100dvh-90px))] sm:max-w-[400px] sm:rounded-[36px] sm:border-[7px] sm:border-mt-ink sm:shadow-2xl">
+      <IPhoneFrame>
         <ToastHost />
         {user
-          ? <Phone key={user.id} uid={user.id} />
-          : <div className="flex-1 overflow-y-auto"><LoginScreen onSuccess={setUser} /></div>}
-      </div>
+          ? <div className="flex min-h-0 flex-1 flex-col pb-3"><Phone key={user.id} uid={user.id} /></div>
+          : <div className="flex-1 overflow-y-auto pb-5"><LoginScreen onSuccess={setUser} /></div>}
+      </IPhoneFrame>
     </div>
   )
 }

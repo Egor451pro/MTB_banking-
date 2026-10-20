@@ -236,7 +236,7 @@ export function Header({ title, subtitle, onBack, right, tall }: {
   title: string; subtitle?: string; onBack?: () => void; right?: ReactNode; tall?: boolean
 }) {
   return (
-    <div className={`rounded-b-[32px] bg-gradient-to-b from-[#2B5FDB] to-[#6AA6F3] px-4 pt-6 text-white ${tall ? 'pb-16' : 'pb-6'}`}>
+    <div className={`rounded-b-[32px] bg-gradient-to-b from-[#2B5FDB] to-[#6AA6F3] px-4 pt-[52px] text-white ${tall ? 'pb-16' : 'pb-6'}`}>
       <div className="flex items-center gap-3">
         {onBack && (
           <button onClick={onBack} aria-label="Назад" className="-ml-1 flex h-11 w-11 items-center justify-center rounded-2xl bg-white/20 transition hover:bg-white/30">
