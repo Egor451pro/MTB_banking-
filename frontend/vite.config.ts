@@ -1,5 +1,7 @@
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
+import tailwindcss from 'tailwindcss'
+import autoprefixer from 'autoprefixer'
 
 // host: true — чтобы открывать с телефона по адресу ноутбука в Wi-Fi.
 // proxy: запросы на /api фронт-сервер сам пересылает бэкенду на :8000.
@@ -7,6 +9,12 @@ import react from '@vitejs/plugin-react'
 // и всё работает с телефона и через туннель, где localhost:8000 недоступен.
 export default defineConfig({
   plugins: [react()],
+  css: {
+    // Явно: после смены веток Vite иногда отдавал сырые @tailwind без PostCSS
+    postcss: {
+      plugins: [tailwindcss(), autoprefixer()],
+    },
+  },
   server: {
     host: true,
     port: 5173,
