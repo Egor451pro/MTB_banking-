@@ -19,7 +19,7 @@ export default {
           soft: '#82AED3',
           ink: '#141416',
         },
-        line: '#DCE5F0',
+        line: '#EEF0F4',
         muted: '#5E6878',
       },
       fontFamily: {

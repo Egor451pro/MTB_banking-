@@ -5,7 +5,7 @@ import { BottomNav, ToastHost, Loading, type TabDef } from './ui'
 import { useData } from './hooks'
 import type { Me } from './types'
 import { ChildGoals, ChildHome, ChildLevel, ChildPay, ChildTasks, RequestScreen } from './screens/child'
-import { ChildManage, PackageFlow, ParentHome, ParentRequests, ParentTasks } from './screens/parent'
+import { ChildManage, PackageFlow, ParentHome, ParentProducts, ParentRequests, ParentTasks } from './screens/parent'
 
 const DEMO_USERS = [
   { id: 1, label: 'Мама' },
@@ -18,7 +18,8 @@ function ParentShell() {
   const fam = useData(() => api.getFamily(), [], 3000)
   const pending = fam.data?.children.reduce((s, c) => s + c.pending_requests, 0) ?? 0
   const tabs: TabDef[] = [
-    { id: 'home', label: 'Семья', icon: 'home' },
+    { id: 'home', label: 'Главная', icon: 'home' },
+    { id: 'products', label: 'Продукты', icon: 'card' },
     { id: 'requests', label: 'Запросы', icon: 'bell', badge: pending },
     { id: 'tasks', label: 'Задания', icon: 'tasks' },
   ]
@@ -26,6 +27,7 @@ function ParentShell() {
   let body
   if (top?.name === 'child') body = <ChildManage key={top.params!.id} id={top.params!.id} />
   else if (top?.name === 'package') body = <PackageFlow />
+  else if (tab === 'products') body = <ParentProducts />
   else if (tab === 'requests') body = <ParentRequests />
   else if (tab === 'tasks') body = <ParentTasks />
   else body = <ParentHome />
@@ -97,7 +99,7 @@ export default function App() {
           ))}
         </div>
       </div>
-      <div className="relative flex h-[calc(100dvh-44px)] w-full flex-col overflow-hidden bg-mt-cloud sm:h-[min(820px,calc(100dvh-90px))] sm:max-w-[400px] sm:rounded-[36px] sm:border-[7px] sm:border-mt-ink sm:shadow-2xl">
+      <div className="relative flex h-[calc(100dvh-44px)] w-full flex-col overflow-hidden bg-[#EDEFF3] sm:h-[min(820px,calc(100dvh-90px))] sm:max-w-[400px] sm:rounded-[36px] sm:border-[7px] sm:border-mt-ink sm:shadow-2xl">
         <ToastHost />
         <Phone key={uid} uid={uid} />
       </div>

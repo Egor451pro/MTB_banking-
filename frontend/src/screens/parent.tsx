@@ -6,7 +6,7 @@ import { Icon, type IconName } from '../icons'
 import { useNav } from '../nav'
 import {
   Avatar, BalanceCard, Badge, Btn, Card, Empty, Field, Header, IconTile, Loading, Note, Progress,
-  Row, Section, Segmented, Sheet, Toggle, toast,
+  FloatAction, Row, Section, Segmented, Sheet, Toggle, toast,
 } from '../ui'
 import type { Category, ChildDetail, ConsentType, LimitItem } from '../types'
 import { GoalCard, REQ_ICON, TaskHead, TxList, requestText } from './shared'
@@ -60,17 +60,46 @@ export function ParentHome() {
           ))}
         </Section>
 
-        <div className="rounded-2xl bg-mt-blue p-5 text-white">
-          <div className="text-lg font-bold leading-snug tracking-tight">Детская карта от 7 лет</div>
-          <p className="mt-1 text-sm text-white/80">Лимиты, категории и цели — под вашим контролем. Ребёнок получает свой вход в Moby.</p>
-          <div className="mt-4"><Btn tone="accent" icon="plus" onClick={() => push({ name: 'package' })}>Оформить пакет</Btn></div>
-        </div>
-
         <button onClick={async () => { await api.demoReset(); await reload(); toast('Демо-данные сброшены') }} className="mx-auto flex items-center gap-1.5 py-2 text-xs font-medium text-muted">
           <Icon name="refresh" size={14} />Сбросить демо-данные
         </button>
       </div>
     </>
+  )
+}
+
+// ───────── Продукты: здесь, как и в Moby, оформляются новые продукты ─────────
+export function ParentProducts() {
+  const { push, setTab } = useNav()
+  const fam = useData(() => api.getFamily(), [])
+  const kids = fam.data?.children ?? []
+  return (
+    <div className="flex min-h-full flex-col">
+      <div className="flex-1 space-y-4 p-4 pt-6">
+        <button onClick={() => push({ name: 'package' })} className="relative block h-[150px] w-full overflow-hidden rounded-[20px] bg-gradient-to-br from-mt-blue via-[#2B5FDB] to-[#6AA6F3] p-5 text-left text-white">
+          <div className="absolute -left-10 -top-16 h-40 w-40 rounded-full bg-white/10 blur-2xl" />
+          <div className="relative z-10 max-w-[58%]">
+            <div className="text-xs font-semibold uppercase tracking-wider text-white/75">Новое в Moby</div>
+            <div className="mt-1 text-[26px] font-extrabold leading-none tracking-tight">Детская карта</div>
+            <div className="mt-2 text-sm font-medium leading-snug text-white/90">с 7 лет — под вашим контролем</div>
+          </div>
+          <div className="absolute -right-5 top-7 h-[96px] w-[150px] rotate-[-12deg] rounded-[14px] bg-gradient-to-br from-mt-red to-mt-orange shadow-[0_18px_30px_-10px_rgba(0,0,0,0.45)]">
+            <div className="absolute left-3.5 top-3.5 h-5 w-7 rounded-md bg-white/45" />
+            <div className="absolute -right-4 -top-6 h-16 w-16 rounded-full bg-white/20 blur-md" />
+            <div className="absolute bottom-3 right-3.5 text-[11px] font-bold tracking-[0.25em] text-white/90">KIDS</div>
+          </div>
+        </button>
+
+        <Card className="p-0 py-1">
+          <Row plain icon="card" title="Детские карты" sub={kids.length ? `Карты ваших детей: ${kids.length}` : 'Карт пока нет'} onClick={() => setTab('home')} />
+          <Row plain icon="target" title="Цели детей" sub="Копилки и ваш бонус к накоплениям" onClick={() => kids[0] && push({ name: 'child', params: { id: kids[0].id } })} />
+          <Row plain icon="tasks" title="Задания с наградой" sub="Поручения, за которые ребёнок получает деньги" onClick={() => setTab('tasks')} />
+          <div className="mx-4 my-1 h-px bg-line" />
+          <Row plain icon="shield" title="Детский пакет" sub="Карта и вход в Moby для ребёнка 7–17 лет" onClick={() => push({ name: 'package' })} />
+        </Card>
+      </div>
+      <FloatAction icon="card-plus" label="Оформить" onClick={() => push({ name: 'package' })} />
+    </div>
   )
 }
 
@@ -112,7 +141,7 @@ export function PackageFlow() {
       <Header title="Детский пакет" subtitle={`Шаг ${step + 1} из 3`} onBack={step > 0 ? () => setStep(step - 1) : back} />
       <div className="space-y-4 p-4">
         <div className="flex gap-1.5">
-          {[0, 1, 2].map((i) => <div key={i} className={`h-1 flex-1 rounded-full ${i <= step ? 'bg-mt-blue' : 'bg-[#C9D5E3]'}`} />)}
+          {[0, 1, 2].map((i) => <div key={i} className={`h-1 flex-1 rounded-full ${i <= step ? 'bg-[#2F6FE4]' : 'bg-[#C9D5E3]'}`} />)}
         </div>
 
         {step === 0 && (
@@ -209,7 +238,7 @@ export function ChildManage({ id }: { id: number }) {
           <Field label="Сумма" inputMode="decimal" value={amount} onChange={setAmount} placeholder="0" suffix="BYN" />
           <div className="flex gap-2">
             {[5, 10, 20, 50].map((v) => (
-              <button key={v} onClick={() => setAmount(String(v))} className="h-9 flex-1 rounded-[10px] bg-mt-cloud text-sm font-semibold text-mt-blue">{v} BYN</button>
+              <button key={v} onClick={() => setAmount(String(v))} className="h-9 flex-1 rounded-[10px] bg-[#E9F1FE] text-sm font-semibold text-[#2F6FE4]">{v} BYN</button>
             ))}
           </div>
           <Btn onClick={async () => {
@@ -346,7 +375,7 @@ export function ParentRequests() {
               <Badge tone="sky"><Icon name={REQ_ICON[r.type]} size={14} />{REQ_SHORT[r.type]}</Badge>
             </div>
             <div className="mt-3 text-xl font-bold tracking-tight text-mt-ink">{requestText(r)}</div>
-            {r.comment && <div className="mt-2 rounded-xl bg-mt-cloud px-3 py-2.5 text-sm text-mt-ink">«{r.comment}»</div>}
+            {r.comment && <div className="mt-2 rounded-xl bg-[#F3F5F8] px-3 py-2.5 text-sm text-mt-ink">«{r.comment}»</div>}
             <div className="mt-4 grid grid-cols-2 gap-2">
               <Btn small tone="danger" onClick={async () => { await api.rejectRequest(r.id); await reload(); toast('Запрос отклонён') }}>Отклонить</Btn>
               <Btn small onClick={async () => { await api.approveRequest(r.id); await reload(); toast('Одобрено') }}>Одобрить</Btn>

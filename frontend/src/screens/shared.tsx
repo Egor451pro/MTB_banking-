@@ -23,7 +23,7 @@ export function TxRow({ t }: { t: Transaction }) {
         </div>
       </div>
       <div className="shrink-0 text-right">
-        <div className={`text-[15px] font-semibold tabular-nums ${declined ? 'text-[#9AA6B8] line-through' : income ? 'text-mt-blue' : 'text-mt-ink'}`}>
+        <div className={`text-[15px] font-semibold tabular-nums ${declined ? 'text-[#9AA6B8] line-through' : income ? 'text-[#2F6FE4]' : 'text-mt-ink'}`}>
           {income ? '+' : '−'}{money(t.amount_cents)}
         </div>
         <div className="text-xs tabular-nums text-muted">{dateTime(t.created_at)}</div>
@@ -53,7 +53,7 @@ export function GoalCard({ g, children }: { g: Goal; children?: ReactNode }) {
         <div className="min-w-0 flex-1">
           <div className="flex items-center justify-between gap-2">
             <div className="truncate text-base font-semibold text-mt-ink">{g.title}</div>
-            <div className="text-sm font-bold tabular-nums text-mt-blue">{pct}%</div>
+            <div className="text-sm font-bold tabular-nums text-[#2F6FE4]">{pct}%</div>
           </div>
           <div className="mt-0.5 text-[13px] tabular-nums text-muted">{money(g.saved_cents)} из {money(g.target_cents)}</div>
         </div>

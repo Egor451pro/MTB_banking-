@@ -4,6 +4,7 @@ import type { ReactNode } from 'react'
 // Цвет берётся из currentColor, поэтому иконку красят классом text-*.
 const PATHS = {
   home: <path d="M3 10.5 12 3l9 7.5V20a1 1 0 0 1-1 1h-5v-6h-6v6H4a1 1 0 0 1-1-1z" />,
+  'card-plus': <><path d="M20 11V7.5A2.5 2.5 0 0 0 17.5 5h-12A2.5 2.5 0 0 0 3 7.5v9A2.5 2.5 0 0 0 5.5 19H13" /><path d="M3 10h17M18 15v6M15 18h6" /></>,
   card: <><rect x="3" y="5" width="18" height="14" rx="2.5" /><path d="M3 10h18M7 15h4" /></>,
   bell: <><path d="M6 16v-5a6 6 0 1 1 12 0v5l1.5 2h-15z" /><path d="M10 20.5a2 2 0 0 0 4 0" /></>,
   tasks: <><rect x="4" y="4" width="16" height="16" rx="3.5" /><path d="m8.5 12 2.5 2.5 4.5-5" /></>,

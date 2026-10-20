@@ -5,9 +5,13 @@
 html, body, #root { height: 100%; }
 body {
   margin: 0;
-  background: #D5E3F2;
+  background: linear-gradient(180deg, #E7F4FF 0%, #C9E2F8 100%) fixed; /* фон вокруг «телефона» */
   color: #141416;
   -webkit-font-smoothing: antialiased;
   -webkit-tap-highlight-color: transparent;
 }
 input, select, button { font: inherit; }
+
+/* Прячем полосы прокрутки: в мобильном приложении их не видно, листать можно как обычно */
+* { scrollbar-width: none; }
+*::-webkit-scrollbar { display: none; }

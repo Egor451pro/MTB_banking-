@@ -35,7 +35,7 @@ export function ChildHome({ meId }: { meId: number }) {
 
         <div className="grid grid-cols-4 gap-2">
           {actions.map((a) => (
-            <button key={a.label} onClick={a.go} className="flex flex-col items-center gap-1.5 rounded-2xl border border-line bg-white py-3 transition active:bg-[#F4F9FF]">
+            <button key={a.label} onClick={a.go} className="flex flex-col items-center gap-1.5 rounded-[20px] bg-white py-3 transition active:scale-[0.97]">
               <IconTile name={a.icon} />
               <span className="text-xs font-semibold text-mt-ink">{a.label}</span>
             </button>
@@ -137,7 +137,7 @@ export function ChildPay({ meId }: { meId: number }) {
       <Sheet open={!!res} onClose={() => setRes(null)}>
         {res && (
           <div className="flex flex-col items-center text-center">
-            <div className={`flex h-16 w-16 items-center justify-center rounded-full ${result === 'approved' ? 'bg-mt-blue text-white' : result === 'pending' ? 'bg-mt-sky/50 text-mt-ink' : 'bg-mt-red text-white'}`}>
+            <div className={`flex h-16 w-16 items-center justify-center rounded-full ${result === 'approved' ? 'bg-[#2F6FE4] text-white' : result === 'pending' ? 'bg-mt-sky/50 text-mt-ink' : 'bg-mt-red text-white'}`}>
               <Icon name={result === 'approved' ? 'check' : result === 'pending' ? 'clock' : 'x'} size={32} strokeWidth={2.4} />
             </div>
             <div className="mt-4 text-[22px] font-bold tracking-tight text-mt-ink">
@@ -186,8 +186,8 @@ export function RequestScreen({ type: t0, amount: a0, category: c0 }: { type?: R
                   <div className="text-[15px] font-semibold text-mt-ink">{o.title}</div>
                   <div className="text-[13px] text-muted">{o.sub}</div>
                 </div>
-                <span className={`flex h-5 w-5 items-center justify-center rounded-full border-2 ${on ? 'border-mt-blue' : 'border-[#C9D5E3]'}`}>
-                  {on && <span className="h-2.5 w-2.5 rounded-full bg-mt-blue" />}
+                <span className={`flex h-5 w-5 items-center justify-center rounded-full border-2 ${on ? 'border-[#2F6FE4]' : 'border-[#C9D5E3]'}`}>
+                  {on && <span className="h-2.5 w-2.5 rounded-full bg-[#2F6FE4]" />}
                 </span>
               </button>
             )
@@ -201,9 +201,9 @@ export function RequestScreen({ type: t0, amount: a0, category: c0 }: { type?: R
               {cats.map((k) => {
                 const on = category === k
                 return (
-                  <button key={k} onClick={() => setCategory(k)} className={`flex flex-col items-center gap-1.5 rounded-xl border px-1 py-3 transition ${on ? 'border-mt-blue bg-mt-cloud' : 'border-line bg-white'}`}>
-                    <Icon name={CATEGORY_ICON[k]} size={22} className={on ? 'text-mt-blue' : 'text-muted'} />
-                    <span className={`text-xs font-semibold ${on ? 'text-mt-blue' : 'text-mt-ink'}`}>{CATEGORY_LABEL[k]}</span>
+                  <button key={k} onClick={() => setCategory(k)} className={`flex flex-col items-center gap-1.5 rounded-xl border px-1 py-3 transition ${on ? 'border-[#2F6FE4] bg-[#E9F1FE]' : 'border-transparent bg-white'}`}>
+                    <Icon name={CATEGORY_ICON[k]} size={22} className={on ? 'text-[#2F6FE4]' : 'text-muted'} />
+                    <span className={`text-xs font-semibold ${on ? 'text-[#2F6FE4]' : 'text-mt-ink'}`}>{CATEGORY_LABEL[k]}</span>
                   </button>
                 )
               })}
