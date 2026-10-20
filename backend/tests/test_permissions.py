@@ -173,7 +173,7 @@ async def test_create_package_enables_goals_by_default(client: AsyncClient, seed
         json={
             "child_name": "Петя",
             "child_birth_date": "2014-05-10",
-            "consents": ["card_issue", "moby_access"],
+            "consents": ["card_issue", "moby_access", "personal_data"],
         },
     )
     assert created.status_code == 201

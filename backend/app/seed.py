@@ -112,12 +112,15 @@ async def seed_data():
         # Для Миши (7-13 лет) — без онлайн-платежей; права: goals, partner_offers
         session.add(Consent(child_id=misha.id, consent_type="card_issue"))
         session.add(Consent(child_id=misha.id, consent_type="moby_access"))
+        session.add(Consent(child_id=misha.id, consent_type="personal_data"))
         session.add(Consent(child_id=misha.id, consent_type="goals"))
         session.add(Consent(child_id=misha.id, consent_type="partner_offers"))
         
         # Для Ани (14-17 лет): online_payments, goals, savings, partner_offers
         session.add(Consent(child_id=anya.id, consent_type="card_issue"))
         session.add(Consent(child_id=anya.id, consent_type="moby_access"))
+        session.add(Consent(child_id=anya.id, consent_type="personal_data"))
+        session.add(Consent(child_id=anya.id, consent_type="teen_info_sharing"))
         session.add(Consent(child_id=anya.id, consent_type="online_payments"))
         session.add(Consent(child_id=anya.id, consent_type="goals"))
         session.add(Consent(child_id=anya.id, consent_type="savings"))
