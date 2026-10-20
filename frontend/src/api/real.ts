@@ -32,6 +32,7 @@ export function realApi(base: string): Api {
   const put = <T,>(p: string, b: unknown) => call<T>('PUT', p, b)
 
   return {
+    login: (login) => post('/login', { login }),
     getMe: () => get('/me'),
     getFamily: () => get('/family'),
     createPackage: (r) => post('/family/package', r),

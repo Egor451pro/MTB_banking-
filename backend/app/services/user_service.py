@@ -1,6 +1,7 @@
 """
 Бизнес-логика для работы с пользователями и детьми
 """
+from fastapi import HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func
 from datetime import date, datetime
@@ -10,7 +11,8 @@ import pytz
 from app.models import User, Account, Limit, Transaction, TransactionStatus, TransactionDirection, Consent
 from app.schemas.user import (
     MeResponse, ChildProfileResponse, AgeGroup,
-    CardInfo, LimitsToday, LevelInfo, Permissions
+    CardInfo, LimitsToday, LevelInfo, Permissions,
+    LoginResponse,
 )
 
 
@@ -101,6 +103,26 @@ class UserService:
         )
         return result.scalar_one_or_none() is not None
     
+    @staticmethod
+    async def login(login: str, db: AsyncSession) -> LoginResponse:
+        """Демо-вход по имени: «мама», «миша», «аня» (без учёта регистра)."""
+        key = login.strip().lower()
+        if not key:
+            raise HTTPException(
+                status_code=422,
+                detail={"error": "validation_error", "message": "Укажите логин"},
+            )
+        result = await db.execute(select(User))
+        for user in result.scalars().all():
+            name = user.name.strip().lower()
+            first = name.split()[0] if name else ""
+            if name == key or first == key:
+                return LoginResponse(id=user.id, role=user.role.value, name=user.name)
+        raise HTTPException(
+            status_code=404,
+            detail={"error": "not_found", "message": "Пользователь не найден"},
+        )
+
     @staticmethod
     async def get_me(user: User) -> MeResponse:
         """Возвращает информацию о текущем пользователе"""

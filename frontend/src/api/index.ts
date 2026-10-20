@@ -6,11 +6,14 @@ import type {
 import { realApi } from './real'
 import { mockApi } from './mock'
 
-// Текущий пользователь. Демо-переключатель меняет его, а клиент шлёт как X-User-Id.
-export const session = { userId: 1 }
+// Текущий пользователь после демо-входа. Клиент шлёт его как X-User-Id.
+export const session = { userId: 0 }
+
+export type LoginResult = { id: number; role: 'parent' | 'child'; name: string }
 
 // Один интерфейс для настоящего API и для mock: экраны не знают, что за ним стоит.
 export interface Api {
+  login(login: string): Promise<LoginResult>
   getMe(): Promise<Me>
   getFamily(): Promise<FamilyResp>
   createPackage(req: PackageReq): Promise<{ child_id: number; card_id: number; age_group: string; consents: string[] }>

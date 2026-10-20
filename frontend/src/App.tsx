@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { api, session, usingMock } from './api'
+import { api, session, usingMock, type LoginResult } from './api'
 import { NavProvider, useNav } from './nav'
 import { BonusBannerHost, BottomNav, ToastHost, Loading, type TabDef } from './ui'
 import { useData } from './hooks'
@@ -7,12 +7,7 @@ import type { Me } from './types'
 import { ChildGoals, ChildHome, ChildLevel, ChildPay, ChildTasks, LessonScreen, RequestScreen } from './screens/child'
 import { LoyaltyScreen } from './screens/shared'
 import { ChildManage, PackageFlow, ParentHome, ParentProducts, ParentRequests, ParentTasks } from './screens/parent'
-
-const DEMO_USERS = [
-  { id: 1, label: 'Мама' },
-  { id: 2, label: 'Миша, 10' },
-  { id: 3, label: 'Аня, 15' },
-]
+import { LoginScreen } from './screens/auth'
 
 function ParentShell() {
   const { tab, setTab, stack, back } = useNav()
@@ -92,28 +87,39 @@ function Phone({ uid }: { uid: number }) {
 }
 
 export default function App() {
-  const [uid, setUid] = useState(1)
+  const [user, setUser] = useState<LoginResult | null>(null)
   // session.userId выставляется до рендера экранов, чтобы первый запрос ушёл от нужного пользователя
-  session.userId = uid
+  if (user) session.userId = user.id
+
   return (
     <div className="flex min-h-[100dvh] flex-col items-center sm:gap-4 sm:py-5">
       <div className="flex w-full items-center justify-center gap-2 bg-white px-3 py-2 sm:w-auto sm:rounded-full sm:py-1.5 sm:pl-4 sm:shadow-sm">
         <span className="text-xs font-semibold text-muted">Демо{usingMock ? ' · mock' : ''}</span>
-        <div className="flex rounded-full bg-[#EEF1F5] p-0.5">
-          {DEMO_USERS.map((u) => (
+        {user ? (
+          <>
+            <span className="text-[13px] font-semibold text-mt-ink">{user.name}</span>
             <button
-              key={u.id} onClick={() => setUid(u.id)}
-              className={`rounded-full px-3 py-1 text-[13px] font-semibold transition ${uid === u.id ? 'bg-mt-blue text-white' : 'text-muted'}`}
+              type="button"
+              onClick={() => { session.userId = 0; setUser(null) }}
+              className="rounded-full bg-[#EEF1F5] px-3 py-1 text-[13px] font-semibold text-muted transition hover:text-mt-ink"
             >
-              {u.label}
+              Выйти
             </button>
-          ))}
-        </div>
+          </>
+        ) : (
+          <span className="text-[13px] font-medium text-muted">Вход в Moby</span>
+        )}
       </div>
       <div className="relative flex h-[calc(100dvh-52px)] w-full flex-col overflow-hidden bg-[#EDEFF3] sm:h-[min(820px,calc(100dvh-90px))] sm:max-w-[400px] sm:rounded-[36px] sm:border-[7px] sm:border-mt-ink sm:shadow-2xl">
         <ToastHost />
+<<<<<<< HEAD
         <BonusBannerHost />
         <Phone key={uid} uid={uid} />
+=======
+        {user
+          ? <Phone key={user.id} uid={user.id} />
+          : <div className="flex-1 overflow-y-auto"><LoginScreen onSuccess={setUser} /></div>}
+>>>>>>> feature/backCursor
       </div>
     </div>
   )

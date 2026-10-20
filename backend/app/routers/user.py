@@ -14,6 +14,8 @@ from app.schemas.user import (
     CardReissueResponse,
     CardStatusResponse,
     ChildProfileResponse,
+    LoginRequest,
+    LoginResponse,
     MeResponse,
     TopupRequest,
     TopupResponse,
@@ -24,6 +26,15 @@ from app.services.permission_service import PermissionService
 from app.services.user_service import UserService
 
 router = APIRouter()
+
+
+@router.post("/login", response_model=LoginResponse)
+async def login(
+    request: LoginRequest,
+    db: AsyncSession = Depends(get_db),
+):
+    """POST /login — демо-вход по имени (мама / миша / аня). Без токена."""
+    return await UserService.login(login=request.login, db=db)
 
 
 @router.get("/me", response_model=MeResponse)
