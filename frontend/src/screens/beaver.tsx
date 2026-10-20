@@ -8,7 +8,13 @@ import '../beaver.css'
 // Вкладка «Бобёр»: питомец строит плотину из брёвен.
 // Брёвна ребёнок зарабатывает за реальные финансовые действия (их считаем из уже существующих данных:
 // накопления в целях, подтверждённые задания, достигнутые цели, пройденные уроки). Купить брёвна нельзя.
-// Потраченные на стройку брёвна пока хранятся в браузере; на бэкенд это переедет вместе с таблицей питомца.
+// Потраченные на стройку брёвна и показанный уровень пока хранятся в браузере;
+// на бэкенд это переедет вместе с таблицей питомца.
+//
+// Две сцены:
+//  1) «Построить» — бобёр в своей одежде бросает брёвна по одному, плотина вздрагивает;
+//  2) переход на новый уровень — бобёр переодевается в строителя, плотина достраивается
+//     несколько секунд (картинка плавно перетекает в новый уровень), он комментирует работу.
 
 const LOGS_PER_BUILD = 5
 const LOGS_PER_5_BYN = 1
@@ -16,10 +22,14 @@ const LOGS_PER_TASK = 3
 const LOGS_PER_GOAL_DONE = 20
 const LOGS_PER_LESSON = 2
 
-const PRE_WORK_MS = 1100   // бобёр надевает каску, прежде чем начать
+const PRE_WORK_MS = 250    // пауза перед первым броском
 const THROW_GAP_MS = 800   // пауза между бросками
-const SPEECH_AT_WORK = ['Таскаю брёвна!', 'Строю плотину…', 'Ещё одно бревно!', 'Почти готово…', 'Держись, плотина!']
 const FLIGHT_MS = 560      // сколько летит бревно
+const SPEECH_AT_WORK = ['Таскаю брёвна!', 'Ещё одно бревно!', 'Держись, плотина!', 'Почти готово…', 'Хоп!']
+
+const LEVEL_BUILD_MS = 9000 // сколько достраивается плотина при переходе на новый уровень
+const SPEECH_AT_LEVEL = ['Надеваю каску!', 'Строю плотину!', 'Укладываю брёвна…', 'Закрепляю ветками…', 'Почти готово!']
+const BUILDER_FALLBACK = '/beaver/builder.png' // общий строитель, пока нет отдельных для малыша и подростка
 
 // need — сколько брёвен нужно уже построить, чтобы достичь уровня
 export const DAM_LEVELS = [
@@ -29,12 +39,16 @@ export const DAM_LEVELS = [
   { n: 4, need: 80, title: 'Плотина с домиком' },
 ]
 
-const storageKey = (id: number) => `beaver:${id}`
-function loadBuilt(id: number): number {
-  try { return Number(localStorage.getItem(storageKey(id))) || 0 } catch { return 0 }
+const builtKey = (id: number) => `beaver:${id}`
+const shownKey = (id: number) => `beaver:${id}:lv`
+function loadNum(key: string): number | null {
+  try {
+    const v = localStorage.getItem(key)
+    return v === null ? null : Number(v) || 0
+  } catch { return null }
 }
-function saveBuilt(id: number, v: number) {
-  try { localStorage.setItem(storageKey(id), String(v)) } catch { /* без хранилища просто не запоминаем */ }
+function saveNum(key: string, v: number) {
+  try { localStorage.setItem(key, String(v)) } catch { /* без хранилища просто не запоминаем */ }
 }
 
 function levelFor(built: number) {
@@ -62,16 +76,19 @@ export function BeaverScreen({ meId, ageGroup }: { meId: number; ageGroup: strin
   const teen = ageGroup === '14-17'
   const sprite = teen ? '/beaver/teen.png' : '/beaver/kid.png'
   const spriteUp = teen ? '/beaver/teen.png' : '/beaver/kid-wave.png'
-  // «Рабочая форма» строителя (каска, жилет, молоток), одна на все возрасты. Если файла нет, onError возвращает обычный спрайт
-  const spriteBuilder = '/beaver/builder.png'
+  const spriteBuilder = teen ? '/beaver/teen-builder.png' : '/beaver/kid-builder.png'
 
   const goals = useData(() => api.getGoals(meId), [meId], 3000)
   const tasks = useData(() => api.listTasks(), [], 3000)
   const lessons = useData(() => api.getLessons(), [], 3000)
-  const [built, setBuilt] = useState(() => loadBuilt(meId))
+  const [built, setBuilt] = useState(() => loadNum(builtKey(meId)) ?? 0)
+  // Какой уровень плотины сейчас показан. Он отстаёт от «заслуженного», пока идёт достройка.
+  const [shown, setShown] = useState(() => loadNum(shownKey(meId)) ?? levelFor(loadNum(builtKey(meId)) ?? 0).n)
   const [bump, setBump] = useState(0)
   const [levelUp, setLevelUp] = useState<number | null>(null)
-  const [busy, setBusy] = useState(false)
+  const [throwing, setThrowing] = useState(false)
+  const [target, setTarget] = useState<number | null>(null) // уровень, который сейчас достраивается
+  const [cProg, setCProg] = useState(0)                      // 0..1 — ход достройки
   const [flying, setFlying] = useState<number[]>([])
   const [pops, setPops] = useState<number[]>([])
   const [confetti, setConfetti] = useState(false)
@@ -80,8 +97,12 @@ export function BeaverScreen({ meId, ageGroup }: { meId: number; ageGroup: strin
   const damRef = useRef<HTMLDivElement>(null)
   const beaverRef = useRef<HTMLDivElement>(null)
   const timers = useRef<number[]>([])
+  const intervals = useRef<number[]>([])
   const uid = useRef(0)
-  useEffect(() => () => { timers.current.forEach((t) => window.clearTimeout(t)) }, [])
+  useEffect(() => () => {
+    timers.current.forEach((t) => window.clearTimeout(t))
+    intervals.current.forEach((t) => window.clearInterval(t))
+  }, [])
   const later = (fn: () => void, ms: number) => { timers.current.push(window.setTimeout(fn, ms)) }
 
   const confettiPieces = useMemo(
@@ -95,6 +116,53 @@ export function BeaverScreen({ meId, ageGroup }: { meId: number; ageGroup: strin
     [],
   )
 
+  const thud = (strong = false) => {
+    damRef.current?.animate(
+      [
+        { transform: 'translate(0,0) scale(1)' },
+        { transform: `translate(2px,3px) scale(${strong ? 1.02 : 1.012})`, offset: 0.3 },
+        { transform: 'translate(-2px,1px) scale(1.006)', offset: 0.6 },
+        { transform: 'translate(0,0) scale(1)' },
+      ],
+      { duration: 280, easing: 'ease-out' },
+    )
+  }
+
+  // Переход на новый уровень: бобёр-строитель достраивает плотину LEVEL_BUILD_MS
+  const startConstruction = (to: number) => {
+    setTarget(to)
+    setCProg(0)
+    setSpeech(SPEECH_AT_LEVEL[0])
+    const t0 = Date.now()
+    let lastHit = -1
+    const iv = window.setInterval(() => {
+      const p = Math.min(1, (Date.now() - t0) / LEVEL_BUILD_MS)
+      setCProg(p)
+      setSpeech(SPEECH_AT_LEVEL[Math.min(SPEECH_AT_LEVEL.length - 1, Math.floor(p * SPEECH_AT_LEVEL.length))])
+      const hit = Math.floor((Date.now() - t0) / 700)
+      if (hit !== lastHit) { lastHit = hit; thud() }
+      if (p >= 1) {
+        window.clearInterval(iv)
+        setShown(to)
+        saveNum(shownKey(meId), to)
+        setTarget(null)
+        setSpeech('Плотина готова!')
+        later(() => setSpeech(null), 1600)
+        setConfetti(true)
+        later(() => setConfetti(false), 2200)
+        later(() => setLevelUp(to), 1000)
+      }
+    }, 120)
+    intervals.current.push(iv)
+  }
+
+  // Зашли на вкладку, а «заслуженный» уровень выше показанного — значит плотину ещё достраивать
+  useEffect(() => {
+    const earnedLevel = levelFor(built).n
+    if (earnedLevel > shown && target === null && !throwing) startConstruction(earnedLevel)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
   if (!goals.data || !tasks.data || !lessons.data) return <><Header title="Мой бобёр" /><Loading /></>
 
   const g = goals.data.items
@@ -104,17 +172,18 @@ export function BeaverScreen({ meId, ageGroup }: { meId: number; ageGroup: strin
   const earned = fromGoals + fromTasks + fromLessons
   const balance = Math.max(0, earned - built)
 
-  const level = levelFor(built)
-  const next = DAM_LEVELS.find((l) => l.n === level.n + 1)
+  const constructing = target !== null
+  const busy = throwing || constructing
+  const earnedLevel = levelFor(built)
+  const shownLevel = DAM_LEVELS.find((l) => l.n === shown) ?? DAM_LEVELS[0]
+  const next = DAM_LEVELS.find((l) => l.n === earnedLevel.n + 1)
   const spend = Math.min(LOGS_PER_BUILD, balance)
 
   // Бобёр бросает брёвна по одному: прыжок → полёт → шлепок о плотину → +1 к постройке
   const build = () => {
     if (busy || spend <= 0) return
-    setBusy(true)
-    const startLevel = levelFor(built).n
+    setThrowing(true)
     let cur = built
-    setSpeech('Надеваю каску!')
     for (let i = 0; i < spend; i++) {
       later(() => {
         setSpeech(SPEECH_AT_WORK[i % SPEECH_AT_WORK.length])
@@ -133,35 +202,27 @@ export function BeaverScreen({ meId, ageGroup }: { meId: number; ageGroup: strin
           setFlying((f) => f.filter((x) => x !== id))
           cur += 1
           setBuilt(cur)
-          saveBuilt(meId, cur)
+          saveNum(builtKey(meId), cur)
           setBump((b) => b + 1)
           setPops((p) => [...p, id])
           later(() => setPops((p) => p.filter((x) => x !== id)), 900)
-          damRef.current?.animate(
-            [
-              { transform: 'translate(0,0) scale(1)' },
-              { transform: 'translate(2px,3px) scale(1.012)', offset: 0.3 },
-              { transform: 'translate(-2px,1px) scale(1.006)', offset: 0.6 },
-              { transform: 'translate(0,0) scale(1)' },
-            ],
-            { duration: 280, easing: 'ease-out' },
-          )
+          thud()
         }, FLIGHT_MS)
       }, PRE_WORK_MS + i * THROW_GAP_MS)
     }
     later(() => {
-      setBusy(false)
-      setSpeech('Плотина готова!')
-      later(() => setSpeech(null), 1500)
-      if (levelFor(cur).n > startLevel) {
-        setConfetti(true)
-        later(() => setConfetti(false), 2200)
-        later(() => setLevelUp(levelFor(cur).n), 900)
+      setThrowing(false)
+      const reached = levelFor(cur).n
+      if (reached > shown) startConstruction(reached)
+      else {
+        setSpeech('Готово!')
+        later(() => setSpeech(null), 1200)
       }
     }, PRE_WORK_MS + (spend - 1) * THROW_GAP_MS + FLIGHT_MS + 250)
   }
 
   const upLevel = DAM_LEVELS.find((l) => l.n === levelUp)
+  const pct = Math.round(cProg * 100)
 
   return (
     <>
@@ -177,20 +238,28 @@ export function BeaverScreen({ meId, ageGroup }: { meId: number; ageGroup: strin
       <div className="space-y-5 px-4 pb-6 pt-4">
         <div className="relative aspect-[4/3.3] overflow-hidden rounded-[28px] shadow-[0_14px_30px_-18px_rgba(20,20,22,0.45)]">
           <div ref={damRef} className="absolute inset-0">
-            {DAM_LEVELS.map((l) => (
-              <img
-                key={l.n} src={`/beaver/dam${l.n}.jpg`} alt={l.title} draggable={false}
-                className="absolute inset-0 h-full w-full object-cover transition-opacity duration-1000"
-                style={{ opacity: l.n === level.n ? 1 : 0 }}
-              />
-            ))}
+            {DAM_LEVELS.map((l) => {
+              // показанный уровень виден полностью, достраиваемый проступает поверх по мере работы
+              const opacity = l.n === shown ? 1 : l.n === target ? cProg : 0
+              return (
+                <img
+                  key={l.n} src={`/beaver/dam${l.n}.jpg`} alt={l.title} draggable={false}
+                  className={`absolute inset-0 h-full w-full object-cover ${constructing ? 'transition-opacity duration-150 ease-linear' : 'transition-opacity duration-1000'}`}
+                  style={{ opacity }}
+                />
+              )
+            })}
           </div>
 
           <div ref={beaverRef} className="absolute bottom-1 left-2 h-[68%]">
             <img
-              src={busy ? spriteBuilder : sprite} alt="Бобёр" draggable={false}
-              onError={(e) => { if (!e.currentTarget.src.endsWith(sprite)) e.currentTarget.src = sprite }}
-              className={`${busy ? 'anim-work' : 'anim-bob'} h-full select-none drop-shadow-[0_6px_6px_rgba(0,0,0,0.18)]`}
+              src={constructing ? spriteBuilder : sprite} alt="Бобёр" draggable={false}
+              onError={(e) => {
+                const el = e.currentTarget
+                if (el.src.endsWith(spriteBuilder)) el.src = BUILDER_FALLBACK
+                else if (el.src.endsWith(BUILDER_FALLBACK)) el.src = sprite
+              }}
+              className={`${constructing ? 'anim-work' : 'anim-bob'} h-full select-none drop-shadow-[0_6px_6px_rgba(0,0,0,0.18)]`}
             />
           </div>
 
@@ -225,8 +294,14 @@ export function BeaverScreen({ meId, ageGroup }: { meId: number; ageGroup: strin
           ))}
 
           <div className="absolute left-3 top-3 rounded-full bg-white/90 px-3 py-1.5 text-xs font-bold text-[#2334C8]">
-            Уровень {level.n} · {level.title}
+            {constructing ? `🚧 Плотина строится… ${pct}%` : `Уровень ${shownLevel.n} · ${shownLevel.title}`}
           </div>
+
+          {constructing && (
+            <div className="absolute inset-x-0 bottom-0 z-10 h-1.5 bg-black/20">
+              <div className="h-full bg-gradient-to-r from-[#FF5A1F] to-[#E5271E]" style={{ width: `${pct}%` }} />
+            </div>
+          )}
         </div>
 
         <Card>
@@ -241,11 +316,13 @@ export function BeaverScreen({ meId, ageGroup }: { meId: number; ageGroup: strin
         </Card>
 
         <Btn onClick={build} disabled={busy || balance <= 0}>
-          {busy
-            ? 'Бобёр строит…'
-            : balance > 0
-              ? `Построить: положить ${spend} ${logWord(spend)}`
-              : 'Пока нет брёвен — заработай их ниже'}
+          {constructing
+            ? 'Плотина строится…'
+            : throwing
+              ? 'Бобёр кидает брёвна…'
+              : balance > 0
+                ? `Построить: положить ${spend} ${logWord(spend)}`
+                : 'Пока нет брёвен — заработай их ниже'}
         </Btn>
 
         <Section title="Как получить брёвна">
