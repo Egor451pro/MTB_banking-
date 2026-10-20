@@ -87,13 +87,12 @@ function formatStatusTime() {
   return `${d.getHours()}:${String(d.getMinutes()).padStart(2, '0')}`
 }
 
-/** Рамка iPhone 17: тонкий титановый безель, Dynamic Island, живое время */
+/** Рамка как в Xcode: равный безель, статичный Dynamic Island, живое время */
 function IPhoneFrame({ children }: { children: ReactNode }) {
   const [time, setTime] = useState(formatStatusTime)
   useEffect(() => {
     const tick = () => setTime(formatStatusTime())
     tick()
-    // синхронизация к началу минуты, дальше — каждую минуту
     const msToNextMinute = 60_000 - (Date.now() % 60_000) + 50
     let intervalId: ReturnType<typeof setInterval> | undefined
     const timeoutId = setTimeout(() => {
@@ -106,34 +105,33 @@ function IPhoneFrame({ children }: { children: ReactNode }) {
     }
   }, [])
 
+  // Безель 8px со всех сторон: outer radius 52 → inner 44
   return (
     <div
-      className="iphone-frame relative flex h-[calc(100dvh-44px)] w-full flex-col overflow-hidden bg-[#F2F2F7]
+      className="relative flex h-[calc(100dvh-44px)] w-full flex-col overflow-hidden bg-[#F2F2F7]
         sm:h-[min(852px,calc(100dvh-88px))] sm:w-[393px] sm:max-w-[393px]
-        sm:rounded-[46px] sm:p-[3.5px]
-        sm:bg-[linear-gradient(160deg,#4a4a4c_0%,#2a2a2c_18%,#111113_50%,#1f1f21_78%,#3d3d3f_100%)]
-        sm:shadow-[0_0_0_0.5px_rgba(255,255,255,0.18),0_30px_80px_-20px_rgba(0,0,0,0.6),0_10px_28px_-10px_rgba(0,0,0,0.4)]"
+        sm:rounded-[52px] sm:border-[8px] sm:border-[#111111]
+        sm:bg-[#111111] sm:shadow-[0_20px_60px_-16px_rgba(0,0,0,0.45)]"
     >
-      {/* Боковые кнопки */}
-      <div className="pointer-events-none absolute -left-[2.5px] top-[100px] hidden h-[30px] w-[2.5px] rounded-l-[1.5px] bg-[#3a3a3c] sm:block" />
-      <div className="pointer-events-none absolute -left-[2.5px] top-[158px] hidden h-[54px] w-[2.5px] rounded-l-[1.5px] bg-[#3a3a3c] sm:block" />
-      <div className="pointer-events-none absolute -left-[2.5px] top-[224px] hidden h-[54px] w-[2.5px] rounded-l-[1.5px] bg-[#3a3a3c] sm:block" />
-      <div className="pointer-events-none absolute -right-[2.5px] top-[190px] hidden h-[70px] w-[2.5px] rounded-r-[1.5px] bg-[#3a3a3c] sm:block" />
+      {/* Боковые кнопки (вне равного безеля) */}
+      <div className="pointer-events-none absolute -left-[11px] top-[100px] hidden h-[30px] w-[3px] rounded-l-[1px] bg-[#2a2a2a] sm:block" />
+      <div className="pointer-events-none absolute -left-[11px] top-[158px] hidden h-[54px] w-[3px] rounded-l-[1px] bg-[#2a2a2a] sm:block" />
+      <div className="pointer-events-none absolute -left-[11px] top-[224px] hidden h-[54px] w-[3px] rounded-l-[1px] bg-[#2a2a2a] sm:block" />
+      <div className="pointer-events-none absolute -right-[11px] top-[190px] hidden h-[70px] w-[3px] rounded-r-[1px] bg-[#2a2a2a] sm:block" />
 
-      {/* Экран — контент под Dynamic Island, как на настоящем iOS */}
-      <div className="relative flex min-h-0 flex-1 flex-col overflow-hidden bg-[#F2F2F7] sm:rounded-[42.5px]">
-        {/* Статус-бар + Dynamic Island (оверлей) */}
+      <div className="relative flex min-h-0 flex-1 flex-col overflow-hidden bg-[#F2F2F7] sm:rounded-[44px]">
+        {/* Статус-бар + статичный Dynamic Island */}
         <div className="pointer-events-none absolute inset-x-0 top-0 z-30 flex h-[54px] items-end justify-between px-[28px] pb-[11px] text-[15px] font-semibold tracking-[-0.03em] text-white">
-          <span key={time} className="status-time min-w-[54px] pl-0.5 tabular-nums leading-none drop-shadow-sm">{time}</span>
+          <span className="min-w-[54px] pl-0.5 tabular-nums leading-none">{time}</span>
 
-          <div className="dynamic-island absolute left-1/2 top-[12px] h-[37px] w-[126px] -translate-x-1/2 rounded-full bg-black shadow-[inset_0_0_0_1px_rgba(255,255,255,0.1),0_1px_6px_rgba(0,0,0,0.45)]">
-            <div className="dynamic-island-activity absolute left-[18px] top-1/2 h-[8px] w-[8px] -translate-y-1/2 rounded-full bg-[#30D158]" />
-            <div className="absolute right-[16px] top-1/2 h-[12px] w-[12px] -translate-y-1/2 rounded-full bg-[#0a0a0c] shadow-[inset_0_0_0_1.5px_#1a1a1c]">
-              <div className="absolute left-1/2 top-1/2 h-[4.5px] w-[4.5px] -translate-x-1/2 -translate-y-1/2 rounded-full bg-[#152033]" />
+          <div className="absolute left-1/2 top-[12px] h-[37px] w-[126px] -translate-x-1/2 rounded-full bg-black">
+            <div className="absolute left-[22%] top-1/2 h-[9px] w-[9px] -translate-y-1/2 rounded-full bg-[#1a1a1a] ring-1 ring-[#2a2a2a]" />
+            <div className="absolute right-[18px] top-1/2 h-[11px] w-[11px] -translate-y-1/2 rounded-full bg-[#0c0c0e] ring-1 ring-[#222]">
+              <div className="absolute left-1/2 top-1/2 h-[4px] w-[4px] -translate-x-1/2 -translate-y-1/2 rounded-full bg-[#1a2230]" />
             </div>
           </div>
 
-          <div className="flex items-center justify-end gap-[6px] drop-shadow-sm">
+          <div className="flex items-center justify-end gap-[6px]">
             <svg width="19" height="12" viewBox="0 0 19 12" fill="currentColor" aria-hidden>
               <rect x="0" y="8" width="3.2" height="4" rx="0.7" />
               <rect x="4.8" y="5.5" width="3.2" height="6.5" rx="0.7" />
@@ -155,7 +153,6 @@ function IPhoneFrame({ children }: { children: ReactNode }) {
           {children}
         </div>
 
-        {/* Home indicator */}
         <div className="pointer-events-none absolute inset-x-0 bottom-[8px] z-30 flex justify-center">
           <div className="h-[5px] w-[134px] rounded-full bg-black/90" />
         </div>
