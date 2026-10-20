@@ -1,8 +1,8 @@
 """Схемы для истории транзакций."""
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import List, Literal, Optional
 
-from pydantic import BaseModel
+from pydantic import BaseModel, field_serializer
 
 Direction = Literal["in", "out"]
 PaymentStatus = Literal["approved", "declined", "pending"]
@@ -34,6 +34,10 @@ class TransactionItem(BaseModel):
     status: PaymentStatus
     decline_reason: Optional[DeclineReason]
     created_at: datetime
+
+    @field_serializer("created_at")
+    def serialize_created_at(self, value: datetime) -> str:
+        return value.replace(tzinfo=timezone.utc).isoformat()
 
 
 class TransactionsResponse(BaseModel):

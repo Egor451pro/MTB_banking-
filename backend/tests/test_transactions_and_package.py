@@ -43,6 +43,8 @@ async def test_get_transactions_returns_latest_first(client: AsyncClient, seed_t
     assert response.status_code == 200
     assert len(response.json()["items"]) == 1
     assert response.json()["items"][0]["amount_cents"] == 200
+    created_at = response.json()["items"][0]["created_at"]
+    assert created_at.endswith("+00:00") or created_at.endswith("Z")
 
 
 @pytest.mark.asyncio

@@ -1,8 +1,8 @@
 """Схемы для запросов ребенка родителю."""
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import List, Literal, Optional
 
-from pydantic import BaseModel, model_validator
+from pydantic import BaseModel, field_serializer, model_validator
 
 Category = Literal[
     "food",
@@ -52,6 +52,10 @@ class RequestItem(BaseModel):
     comment: str
     status: RequestStatus
     created_at: datetime
+
+    @field_serializer("created_at")
+    def serialize_created_at(self, value: datetime) -> str:
+        return value.replace(tzinfo=timezone.utc).isoformat()
 
 
 class ListRequestsResponse(BaseModel):
