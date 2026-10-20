@@ -420,7 +420,7 @@ export function ChildLevel({ meId }: { meId: number }) {
           </Card>
         </Section>
 
-        <p className="px-1 text-xs text-muted">В 18 лет карта станет взрослой, а вся история и баллы останутся с тобой.</p>
+        <p className="px-1 text-xs text-muted">В 18 лет предложим тебе взрослую карту — перейти можно будет по твоему желанию, баллы сохранятся.</p>
       </div>
     </>
   )

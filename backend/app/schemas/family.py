@@ -30,7 +30,9 @@ class FamilyResponse(BaseModel):
     children: List[FamilyChildSummary]
 
 
-ConsentType = Literal["card_issue", "moby_access", "online_payments"]
+# personal_data — обработка персональных данных ребёнка (Закон № 99-З);
+# teen_info_sharing — согласие подростка 14–17, что родитель видит его операции
+ConsentType = Literal["card_issue", "moby_access", "personal_data", "teen_info_sharing", "online_payments"]
 
 
 class CreatePackageRequest(BaseModel):

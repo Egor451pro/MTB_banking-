@@ -82,7 +82,8 @@ const OFFERS: Offer[] = [
 
 const PERM_KEYS: PermissionKey[] = ['online_payments', 'goals', 'virtual_card', 'savings', 'partner_offers']
 const defaultPerms = (teen: boolean, online: boolean): Record<PermissionKey, boolean> =>
-  ({ online_payments: teen && online, goals: true, virtual_card: false, savings: false, partner_offers: true })
+  // Предложения партнёров по умолчанию выключены: родитель включает их сам
+  ({ online_payments: teen && online, goals: true, virtual_card: false, savings: false, partner_offers: false })
 
 // Пороги опыта: индекс = уровень-1
 const XP_STEPS = [0, 50, 120, 200, 320, 500]
@@ -138,7 +139,7 @@ function seed(): DB {
       { id: 1, assigned_to: 2, title: 'Убрать в комнате', reward_cents: 200, xp_reward: 30, status: 'new', due_date: null },
       { id: 2, assigned_to: 2, title: 'Вынести мусор', reward_cents: 100, xp_reward: 15, status: 'done', due_date: null },
     ],
-    perms: { 2: defaultPerms(false, false), 3: { ...defaultPerms(true, true), savings: true } },
+    perms: { 2: { ...defaultPerms(false, false), partner_offers: true }, 3: { ...defaultPerms(true, true), savings: true, partner_offers: true } },
     allowance: { 2: { amount_cents: 1000, period: 'week', active: true }, 3: { amount_cents: 2000, period: 'week', active: true } },
     lessonsDone: { 3: [1, 3] },
     accepted: {},
@@ -196,7 +197,8 @@ export function mockApi(): Api {
     const teen = isTeen(user(childId))
     return PERM_KEYS.map((key) => ({
       key, enabled: perm(childId, key),
-      locked_reason: key === 'online_payments' && !teen ? 'Доступно с 14 лет' : null,
+      // До 14 лет онлайн-покупки и виртуальная карта закрыты (политика пакета, ст. 27 ГК РБ — малолетние совершают только мелкие бытовые сделки)
+      locked_reason: (key === 'online_payments' || key === 'virtual_card') && !teen ? 'Доступно с 14 лет' : null,
     }))
   }
   // Следующая выплата карманных: завтра или ближайший понедельник
@@ -289,6 +291,9 @@ export function mockApi(): Api {
       const age = ageFrom(req.child_birth_date)
       if (!req.child_name.trim()) throw new MockError('validation_error', 'Укажите имя ребёнка')
       if (age < 7 || age > 17) throw new MockError('validation_error', 'Пакет выпускается для детей 7–17 лет')
+      const need = ['card_issue', 'moby_access', 'personal_data', ...(age >= 14 ? ['teen_info_sharing'] : [])]
+      if (!need.every((c) => req.consents.includes(c as never))) throw new MockError('validation_error', 'Не все обязательные согласия получены')
+      if (age < 14 && req.consents.includes('online_payments')) throw new MockError('validation_error', 'Онлайн-платежи доступны с 14 лет')
       const id = ++db.seq.user
       const accId = ++db.seq.acc
       db.users.push({ id, role: 'child', name: req.child_name.trim(), family_id: p.family_id, birth_date: req.child_birth_date, xp: 0, points: 0 })

@@ -13,7 +13,9 @@ export type TxStatus = 'approved' | 'declined' | 'pending'
 export type ReqType = 'money' | 'limit_increase' | 'category_unlock' | 'product_access'
 export type ReqStatus = 'pending' | 'approved' | 'rejected'
 export type TaskStatus = 'new' | 'done' | 'confirmed' | 'rejected'
-export type ConsentType = 'card_issue' | 'moby_access' | 'online_payments'
+// personal_data — обработка персональных данных ребёнка (Закон РБ № 99-З, до 16 лет согласие даёт законный представитель)
+// teen_info_sharing — согласие подростка 14–17 лет, что родитель видит его операции (подросток — владелец счёта)
+export type ConsentType = 'card_issue' | 'moby_access' | 'personal_data' | 'teen_info_sharing' | 'online_payments'
 
 export interface Me {
   id: number

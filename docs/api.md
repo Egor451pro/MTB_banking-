@@ -390,3 +390,9 @@ Parent видит задания своих детей, child только св�
 
 ### Уровни
 `GET /children/{id}/level` и `/level/suggestion/accept` фронт больше не использует — уровень берётся из `GET /children/{id}`.
+
+### Правовые правила (см. docs/legal.md)
+- `POST /family/package`: обязательные согласия `card_issue`, `moby_access`, `personal_data`; для 14–17 ещё `teen_info_sharing`.
+  Нет обязательного согласия → 422. `online_payments` для 7–13 → 422.
+- Права: `online_payments` и `virtual_card` для 7–13 лет закрыты (`locked_reason: "Доступно с 14 лет"`).
+- `partner_offers` у нового ребёнка по умолчанию выключено — включает родитель.

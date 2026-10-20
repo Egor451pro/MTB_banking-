@@ -146,7 +146,8 @@ export function PackageFlow() {
   const valid = name.trim().length > 0 && ageOk
 
   const toggle = (c: ConsentType) => setConsents((l) => (l.includes(c) ? l.filter((x) => x !== c) : [...l, c]))
-  const okConsents = (['card_issue', 'moby_access'] as ConsentType[]).every((c) => consents.includes(c))
+  const required: ConsentType[] = ['card_issue', 'moby_access', 'personal_data', ...(teen ? ['teen_info_sharing' as ConsentType] : [])]
+  const okConsents = required.every((c) => consents.includes(c))
 
   const features: { icon: IconName; title: string; text: string }[] = [
     { icon: 'card', title: 'Детская карта', text: 'Дневной лимит и запрет категорий' },
@@ -156,13 +157,19 @@ export function PackageFlow() {
     teen
       ? { icon: 'globe', title: 'Онлайн-покупки', text: 'Крупные — только с вашим подтверждением' }
       : { icon: 'shield', title: 'Только офлайн-покупки', text: 'Онлайн откроется с 14 лет' },
-    { icon: 'arrow-up', title: 'В 18 лет — взрослая карта', text: 'Без смены банка, история сохраняется' },
+    { icon: 'arrow-up', title: 'В 18 лет — взрослая карта', text: 'Предложим переход, баллы сохранятся' },
   ]
 
   const consentItems: { id: ConsentType; title: string; text: string; req: boolean }[] = [
-    { id: 'card_issue', title: 'Выпуск детской карты', text: 'Я законный представитель и согласен(на) на выпуск карты', req: true },
-    { id: 'moby_access', title: 'Доступ ребёнка в Moby', text: 'Свой вход с ограниченными правами', req: true },
-    ...(teen ? [{ id: 'online_payments' as ConsentType, title: 'Онлайн-платежи', text: 'Крупные покупки — с вашим подтверждением', req: false }] : []),
+    teen
+      ? { id: 'card_issue', title: 'Согласие на договор подростка', text: 'Даю письменное согласие: подросток сам заключает договор и подтвердит его в своём Moby (ст. 25 ГК РБ)', req: true }
+      : { id: 'card_issue', title: 'Договор от имени ребёнка', text: 'Я законный представитель и заключаю договор за ребёнка (ст. 27 ГК РБ)', req: true },
+    { id: 'moby_access', title: 'Доступ ребёнка в Moby', text: 'Свой вход с правами, которые задаёте вы', req: true },
+    { id: 'personal_data', title: 'Обработка персональных данных', text: 'Данные ребёнка используются только для обслуживания пакета (Закон № 99-З)', req: true },
+    ...(teen ? [
+      { id: 'teen_info_sharing' as ConsentType, title: 'Родитель видит операции', text: 'Подросток подтвердит в Moby, что вы видите операции и ставите лимиты', req: true },
+      { id: 'online_payments' as ConsentType, title: 'Онлайн-платежи', text: 'Крупные покупки — с вашим подтверждением', req: false },
+    ] : []),
   ]
 
   return (
@@ -329,7 +336,7 @@ function LimitsEditor({ childId, onSaved }: { childId: number; onSaved: () => vo
               <div className="min-w-0 flex-1">
                 <div className="text-[15px] font-medium text-mt-ink">{CATEGORY_LABEL[cat]}</div>
                 <div className={`text-[13px] ${locked ? 'text-mt-red' : 'text-muted'}`}>
-                  {locked ? 'Запрещено банком' : allowed ? 'Разрешено' : 'Запрещено вами'}
+                  {locked ? 'Алкоголь, табак, азартные игры — запрещено банком' : allowed ? 'Разрешено' : 'Запрещено вами'}
                 </div>
               </div>
               {locked
