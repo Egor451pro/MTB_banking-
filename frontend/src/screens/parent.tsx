@@ -125,6 +125,15 @@ export function ParentProducts() {
           <Row plain icon="heart" title="Страхование ребёнка" sub="Спорт, путешествия, здоровье" right={<Badge tone="gray">Скоро</Badge>} />
         </Card>
       </div>
+      {/* Липкая синяя кнопка: висит внизу при прокрутке, а в конце списка встаёт под ним и ничего не закрывает */}
+      <div className="sticky bottom-3 z-10 px-4 pb-1">
+        <button
+          type="button" onClick={() => push({ name: 'package' })}
+          className="flex w-full items-center justify-center gap-2 rounded-full bg-[#2B5FDB] py-3.5 text-[16px] font-semibold text-white shadow-[0_10px_24px_-8px_rgba(43,95,219,0.7)] transition active:scale-[0.98]"
+        >
+          <Icon name="card-plus" size={22} />Оформить детский пакет
+        </button>
+      </div>
     </div>
   )
 }
