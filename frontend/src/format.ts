@@ -1,4 +1,5 @@
 import type { Category, DeclineReason, ReqType } from './types'
+import type { IconName } from './icons'
 
 // Деньги приходят в копейках; в рубли переводим только здесь, на экране.
 export function money(cents: number): string {
@@ -27,15 +28,15 @@ export const CATEGORY_LABEL: Record<Category, string> = {
   adult18: 'Категория 18+',
 }
 
-export const CATEGORY_ICON: Record<Category, string> = {
-  food: '🍽️',
-  transport: '🚌',
-  games: '🎮',
-  subscriptions: '📺',
-  shopping: '🛍️',
-  entertainment: '🎬',
-  education: '📚',
-  adult18: '🔞',
+export const CATEGORY_ICON: Record<Category, IconName> = {
+  food: 'food',
+  transport: 'bus',
+  games: 'game',
+  subscriptions: 'play',
+  shopping: 'bag',
+  entertainment: 'ticket',
+  education: 'book',
+  adult18: 'ban',
 }
 
 export const DECLINE_TEXT: Record<DeclineReason, string> = {
@@ -51,6 +52,25 @@ export const REQ_LABEL: Record<ReqType, string> = {
   limit_increase: 'Поднять дневной лимит',
   category_unlock: 'Открыть категорию',
 }
+
+export const REQ_SHORT: Record<ReqType, string> = {
+  money: 'Деньги',
+  limit_increase: 'Лимит',
+  category_unlock: 'Категория',
+}
+
+// 1 запрос, 2 запроса, 5 запросов
+export function plural(n: number, one: string, few: string, many: string): string {
+  const a = Math.abs(n) % 100
+  const b = a % 10
+  if (a > 10 && a < 20) return many
+  if (b > 1 && b < 5) return few
+  if (b === 1) return one
+  return many
+}
+
+// API отдаёт '7-13', показываем с длинным тире
+export const ageLabel = (g: string) => `${g.replace('-', '–')} лет`
 
 export function dateTime(iso: string): string {
   const d = new Date(iso)

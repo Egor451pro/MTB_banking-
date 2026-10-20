@@ -1,13 +1,30 @@
-/** Цвета подогнаны под скриншоты Moby: синий градиент шапки, светлый фон, белые карточки */
+/**
+ * Палитра МТБанка из брендбука:
+ *   MT Blue 60% (основной), MT Red 20% и MT Orange 20% (акценты),
+ *   Cloud / Sky / Soft Blue — фоны, белый и чёрный — текст.
+ * Правило: синий + красный можно без оранжевого, синий + оранжевый — только вместе с красным.
+ */
 export default {
   content: ['./index.html', './src/**/*.{ts,tsx}'],
   theme: {
     extend: {
       colors: {
-        moby: { 50: '#eff5ff', 100: '#dbe8ff', 500: '#3b82f6', 600: '#2563eb', 700: '#1d4ed8', 900: '#14306b' },
-        bg: '#f3f5fa',
+        mt: {
+          blue: '#2334C8',
+          'blue-dark': '#1B289E',
+          red: '#E42C26',
+          orange: '#FF5912',
+          cloud: '#E7F4FF',
+          sky: '#97CFFF',
+          soft: '#82AED3',
+          ink: '#141416',
+        },
+        line: '#DCE5F0',
+        muted: '#5E6878',
       },
-      fontFamily: { sans: ['Inter', 'system-ui', '-apple-system', 'Segoe UI', 'Roboto', 'sans-serif'] },
+      fontFamily: {
+        sans: ['Onest', 'Inter', 'system-ui', '-apple-system', 'Segoe UI', 'Roboto', 'sans-serif'],
+      },
     },
   },
   plugins: [],

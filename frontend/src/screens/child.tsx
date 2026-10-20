@@ -1,59 +1,80 @@
 import { useState } from 'react'
 import { api } from '../api'
-import { CATEGORY_ICON, CATEGORY_LABEL, REQ_LABEL, money, toCents } from '../format'
+import { CATEGORY_ICON, CATEGORY_LABEL, money, toCents } from '../format'
 import { useData } from '../hooks'
+import { Icon, type IconName } from '../icons'
 import { useNav } from '../nav'
-import { BalanceCard, Btn, Card, Chip, Empty, Field, Header, Loading, Progress, Section, Sheet, toast } from '../ui'
+import {
+  Avatar, BalanceCard, Badge, Btn, Card, Empty, Field, Header, IconTile, Loading, Note, Progress,
+  Row, Section, Sheet, toast,
+} from '../ui'
 import type { Category, DeclineReason, PayResult, ReqType } from '../types'
-import { GoalCard, TaskHead, TxList, requestText } from './shared'
+import { GoalCard, LevelRing, REQ_ICON, TaskHead, TxList, requestText } from './shared'
 
 // ───────── Главная ребёнка ─────────
 export function ChildHome({ meId }: { meId: number }) {
   const { push, setTab } = useNav()
   const { data: c } = useData(() => api.getChild(meId), [meId], 2000)
   const reqs = useData(() => api.listRequests(), [], 2000)
-  if (!c) return <Loading />
-  const lim = c.limits_today
+  if (!c) return <><Header title="Привет!" /><Loading /></>
   const waiting = reqs.data?.items.filter((r) => r.status === 'pending').length ?? 0
-  const lvlTotal = c.level.xp + c.level.xp_to_next
+  const lv = c.level
+
+  const actions: { icon: IconName; label: string; go: () => void }[] = [
+    { icon: 'card', label: 'Оплатить', go: () => setTab('pay') },
+    { icon: 'chat', label: 'Попросить', go: () => push({ name: 'request' }) },
+    { icon: 'target', label: 'Цели', go: () => setTab('goals') },
+    { icon: 'tasks', label: 'Задания', go: () => setTab('tasks') },
+  ]
+
   return (
     <>
-      <Header title={`Привет, ${c.name}!`} right={<Chip tone="gray">{c.age_group} лет</Chip>} />
-      <div className="space-y-4 p-4">
-        <BalanceCard card={c.card} title="Моя карта" sub={lim.limit_cents != null ? `Сегодня можно ещё ${money(lim.left_cents ?? 0)}` : undefined} />
+      <Header title={`Привет, ${c.name}!`} subtitle="Детская карта" right={<Avatar name={c.name} light size={38} />} tall />
+      <div className="-mt-12 space-y-5 px-4 pb-6">
+        <BalanceCard card={c.card} title="Мой баланс" limit={c.limits_today} />
 
-        <Card onClick={() => setTab('level')} className="space-y-2">
-          <div className="flex items-center justify-between">
-            <div className="font-semibold">🏆 Уровень {c.level.level}</div>
-            <div className="text-sm text-slate-500">{c.level.xp} XP</div>
+        <div className="grid grid-cols-4 gap-2">
+          {actions.map((a) => (
+            <button key={a.label} onClick={a.go} className="flex flex-col items-center gap-1.5 rounded-2xl border border-line bg-white py-3 transition active:bg-[#F4F9FF]">
+              <IconTile name={a.icon} />
+              <span className="text-xs font-semibold text-mt-ink">{a.label}</span>
+            </button>
+          ))}
+        </div>
+
+        {waiting > 0 && <Note icon="clock">Ждут ответа родителя: {waiting}</Note>}
+
+        <Card onClick={() => setTab('level')}>
+          <div className="flex items-center gap-3">
+            <IconTile name="star" tone="solid" />
+            <div className="min-w-0 flex-1">
+              <div className="text-[15px] font-semibold text-mt-ink">Уровень {lv.level}</div>
+              <div className="text-[13px] tabular-nums text-muted">{lv.xp_to_next > 0 ? `Ещё ${lv.xp_to_next} XP до уровня ${lv.level + 1}` : 'Максимальный уровень'}</div>
+            </div>
+            <Icon name="chevron-right" size={20} className="text-[#9AA6B8]" />
           </div>
-          {c.level.xp_to_next > 0 ? <><Progress value={c.level.xp} max={lvlTotal} /><div className="text-xs text-slate-500">До уровня {c.level.level + 1}: {c.level.xp_to_next} XP</div></> : <div className="text-xs text-slate-500">Максимальный уровень</div>}
+          {lv.xp_to_next > 0 && <div className="mt-3"><Progress value={lv.xp} max={lv.xp + lv.xp_to_next} tone="brand" /></div>}
         </Card>
 
-        <div className="grid grid-cols-2 gap-3">
-          <Btn tone="ghost" onClick={() => setTab('pay')}>💳 Оплатить</Btn>
-          <Btn tone="ghost" onClick={() => push({ name: 'request' })}>🙋 Попросить</Btn>
-        </div>
-        {waiting > 0 && <div className="rounded-xl bg-amber-50 px-3 py-2 text-sm text-amber-700">Ждут ответа родителя: {waiting}</div>}
-
         <Section title="Последние операции">
-          <Card><TxList childId={meId} limit={5} poll={2000} /></Card>
+          <TxList childId={meId} limit={5} poll={2000} />
         </Section>
       </div>
     </>
   )
 }
 
-// ───────── Симулятор оплаты (в проде это делает процессинг банка) ─────────
+// ───────── Оплата: демо-терминал (в проде это делает процессинг банка) ─────────
 interface Merchant { name: string; category: Category; cents: number; online: boolean }
 const MERCHANTS: Merchant[] = [
   { name: 'Столовая школы', category: 'food', cents: 300, online: false },
   { name: 'Автобус', category: 'transport', cents: 120, online: false },
   { name: 'Кофейня', category: 'food', cents: 500, online: false },
+  { name: 'Книжный магазин', category: 'education', cents: 900, online: false },
   { name: 'Игровой магазин', category: 'games', cents: 1500, online: true },
   { name: 'Онлайн-кинотеатр', category: 'subscriptions', cents: 500, online: true },
   { name: 'Сувенирная лавка', category: 'shopping', cents: 2000, online: false },
-  { name: 'Магазин одежды (онлайн)', category: 'shopping', cents: 2500, online: true },
+  { name: 'Магазин одежды', category: 'shopping', cents: 2500, online: true },
   { name: 'Алкомаркет', category: 'adult18', cents: 800, online: false },
 ]
 
@@ -61,15 +82,19 @@ export function ChildPay({ meId }: { meId: number }) {
   const { push } = useNav()
   const { data: c, reload } = useData(() => api.getChild(meId), [meId])
   const [res, setRes] = useState<{ m: Merchant; r: PayResult } | null>(null)
-  if (!c) return <Loading />
+  if (!c) return <><Header title="Оплата" /><Loading /></>
 
   async function pay(m: Merchant) {
-    const r = await api.simulatePayment({ card_id: c!.card.id, amount_cents: m.cents, category: m.category, merchant: m.name, is_online: m.online })
-    setRes({ m, r })
-    await reload()
+    try {
+      const r = await api.simulatePayment({ card_id: c!.card.id, amount_cents: m.cents, category: m.category, merchant: m.name, is_online: m.online })
+      setRes({ m, r })
+      await reload()
+    } catch (e) {
+      toast((e as Error).message)
+    }
   }
 
-  // Что можно попросить у родителя в зависимости от причины отказа
+  // Что можно попросить у родителя, исходя из причины отказа
   function askFor(m: Merchant, reason: DeclineReason | null) {
     if (reason === 'limit_exceeded') return { type: 'limit_increase' as ReqType, amount: m.cents }
     if (reason === 'category_blocked' && m.category !== 'adult18') return { type: 'category_unlock' as ReqType, category: m.category }
@@ -78,32 +103,52 @@ export function ChildPay({ meId }: { meId: number }) {
   }
 
   const ask = res && res.r.status === 'declined' ? askFor(res.m, res.r.decline_reason) : null
+  const lim = c.limits_today
+  const result = res?.r.status
   return (
     <>
-      <Header title="Оплата" />
-      <div className="space-y-3 p-4">
-        <div className="rounded-xl bg-moby-50 px-3 py-2 text-sm text-moby-700">Демо: выберите покупку — банк проверит лимиты и правила родителя. Баланс: <b>{money(c.card.balance_cents)}</b></div>
-        {MERCHANTS.map((m) => (
-          <Card key={m.name} className="flex items-center gap-3">
-            <div className="text-2xl">{CATEGORY_ICON[m.category]}</div>
-            <div className="min-w-0 flex-1">
-              <div className="truncate font-medium">{m.name}</div>
-              <div className="text-xs text-slate-500">{CATEGORY_LABEL[m.category]}{m.online ? ' · онлайн' : ''}</div>
-            </div>
-            <div className="w-24"><Btn small onClick={() => pay(m)}>{money(m.cents)}</Btn></div>
+      <Header title="Оплата" subtitle="Демо: банк проверяет каждую покупку" />
+      <div className="space-y-5 p-4">
+        <Card className="grid grid-cols-2 divide-x divide-line p-0">
+          <div className="px-4 py-3">
+            <div className="text-xs font-medium text-muted">На карте</div>
+            <div className="mt-0.5 text-lg font-bold tabular-nums text-mt-ink">{money(c.card.balance_cents)}</div>
+          </div>
+          <div className="px-4 py-3">
+            <div className="text-xs font-medium text-muted">Можно сегодня</div>
+            <div className="mt-0.5 text-lg font-bold tabular-nums text-mt-ink">{lim.left_cents != null ? money(lim.left_cents) : 'без лимита'}</div>
+          </div>
+        </Card>
+
+        <Section title="Выберите покупку">
+          <Card className="divide-y divide-line p-0">
+            {MERCHANTS.map((m) => (
+              <Row
+                key={m.name} icon={CATEGORY_ICON[m.category]} onClick={() => pay(m)} chevron
+                title={m.name}
+                sub={`${CATEGORY_LABEL[m.category]}${m.online ? ' · онлайн' : ''}`}
+                right={<span className="text-[15px] font-semibold tabular-nums text-mt-ink">{money(m.cents)}</span>}
+              />
+            ))}
           </Card>
-        ))}
+        </Section>
       </div>
 
       <Sheet open={!!res} onClose={() => setRes(null)}>
         {res && (
-          <div className="space-y-3 text-center">
-            <div className="text-5xl">{res.r.status === 'approved' ? '✅' : res.r.status === 'pending' ? '⏳' : '⛔'}</div>
-            <div className="text-xl font-bold">{res.r.status === 'approved' ? 'Оплачено' : res.r.status === 'pending' ? 'Ждём родителя' : 'Отказано'}</div>
-            <div className="text-slate-600">{res.m.name} · {money(res.m.cents)}</div>
-            <div className="rounded-xl bg-slate-50 px-3 py-2 text-sm">{res.r.message}</div>
-            {ask && <Btn onClick={() => { const a = ask; setRes(null); push({ name: 'request', params: a }) }}>Попросить у родителя</Btn>}
-            <Btn tone="ghost" onClick={() => setRes(null)}>Закрыть</Btn>
+          <div className="flex flex-col items-center text-center">
+            <div className={`flex h-16 w-16 items-center justify-center rounded-full ${result === 'approved' ? 'bg-mt-blue text-white' : result === 'pending' ? 'bg-mt-sky/50 text-mt-ink' : 'bg-mt-red text-white'}`}>
+              <Icon name={result === 'approved' ? 'check' : result === 'pending' ? 'clock' : 'x'} size={32} strokeWidth={2.4} />
+            </div>
+            <div className="mt-4 text-[22px] font-bold tracking-tight text-mt-ink">
+              {result === 'approved' ? 'Оплачено' : result === 'pending' ? 'Ждём родителя' : 'Покупка отклонена'}
+            </div>
+            <div className="mt-1 text-[15px] text-muted">{res.m.name} · <span className="tabular-nums">{money(res.m.cents)}</span></div>
+            <div className="mt-4 w-full rounded-xl bg-[#F3F6FA] px-4 py-3 text-sm text-mt-ink">{res.r.message}</div>
+            <div className="mt-5 w-full space-y-2">
+              {ask && <Btn icon="chat" onClick={() => { const a = ask; setRes(null); push({ name: 'request', params: a }) }}>Попросить у родителя</Btn>}
+              <Btn tone="secondary" onClick={() => setRes(null)}>Готово</Btn>
+            </div>
           </div>
         )}
       </Sheet>
@@ -112,6 +157,12 @@ export function ChildPay({ meId }: { meId: number }) {
 }
 
 // ───────── Запрос родителю ─────────
+const REQ_OPTIONS: { id: ReqType; title: string; sub: string }[] = [
+  { id: 'money', title: 'Деньги на карту', sub: 'Не хватает на покупку' },
+  { id: 'limit_increase', title: 'Поднять дневной лимит', sub: 'Нужна покупка дороже лимита' },
+  { id: 'category_unlock', title: 'Открыть категорию', sub: 'Например, игры или подписки' },
+]
+
 export function RequestScreen({ type: t0, amount: a0, category: c0 }: { type?: ReqType; amount?: number; category?: Category }) {
   const { back } = useNav()
   const [type, setType] = useState<ReqType>(t0 ?? 'money')
@@ -124,33 +175,68 @@ export function RequestScreen({ type: t0, amount: a0, category: c0 }: { type?: R
   return (
     <>
       <Header title="Попросить у родителя" onBack={back} />
-      <div className="space-y-4 p-4">
-        <Card className="space-y-3">
-          <div className="flex flex-wrap gap-2">
-            {(Object.keys(REQ_LABEL) as ReqType[]).map((k) => (
-              <button key={k} onClick={() => setType(k)} className={`rounded-full px-3 py-1.5 text-sm ${type === k ? 'bg-moby-600 text-white' : 'bg-slate-100'}`}>{REQ_LABEL[k]}</button>
-            ))}
-          </div>
-          {type !== 'category_unlock'
-            ? <Field label={type === 'money' ? 'Сколько денег, BYN' : 'Какой дневной лимит нужен, BYN'} inputMode="decimal" value={amount} onChange={setAmount} />
-            : <div className="flex flex-wrap gap-2">{cats.map((k) => <button key={k} onClick={() => setCategory(k)} className={`rounded-full px-3 py-1.5 text-sm ${category === k ? 'bg-moby-600 text-white' : 'bg-slate-100'}`}>{CATEGORY_ICON[k]} {CATEGORY_LABEL[k]}</button>)}</div>}
-          <Field label="Зачем? (родитель увидит)" value={comment} onChange={setComment} placeholder="Например, на экскурсию" />
-          <Btn onClick={async () => {
-            const cents = toCents(amount)
-            if (type !== 'category_unlock' && !(cents > 0)) { toast('Укажите сумму'); return }
-            await api.createRequest({ type, amount_cents: type === 'category_unlock' ? undefined : cents, category: type === 'category_unlock' ? category : undefined, comment })
-            setComment(''); setAmount(''); await reload(); toast('Запрос отправлен родителю')
-          }}>Отправить</Btn>
+      <div className="space-y-5 p-4">
+        <Card className="divide-y divide-line p-0">
+          {REQ_OPTIONS.map((o) => {
+            const on = type === o.id
+            return (
+              <button key={o.id} onClick={() => setType(o.id)} className="flex w-full items-center gap-3 px-4 py-3 text-left">
+                <IconTile name={REQ_ICON[o.id]} tone={on ? 'solid' : 'blue'} />
+                <div className="min-w-0 flex-1">
+                  <div className="text-[15px] font-semibold text-mt-ink">{o.title}</div>
+                  <div className="text-[13px] text-muted">{o.sub}</div>
+                </div>
+                <span className={`flex h-5 w-5 items-center justify-center rounded-full border-2 ${on ? 'border-mt-blue' : 'border-[#C9D5E3]'}`}>
+                  {on && <span className="h-2.5 w-2.5 rounded-full bg-mt-blue" />}
+                </span>
+              </button>
+            )
+          })}
         </Card>
 
+        {type !== 'category_unlock'
+          ? <Field label={type === 'money' ? 'Сколько нужно' : 'Какой лимит нужен в день'} inputMode="decimal" value={amount} onChange={setAmount} placeholder="0" suffix="BYN" />
+          : (
+            <div className="grid grid-cols-3 gap-2">
+              {cats.map((k) => {
+                const on = category === k
+                return (
+                  <button key={k} onClick={() => setCategory(k)} className={`flex flex-col items-center gap-1.5 rounded-xl border px-1 py-3 transition ${on ? 'border-mt-blue bg-mt-cloud' : 'border-line bg-white'}`}>
+                    <Icon name={CATEGORY_ICON[k]} size={22} className={on ? 'text-mt-blue' : 'text-muted'} />
+                    <span className={`text-xs font-semibold ${on ? 'text-mt-blue' : 'text-mt-ink'}`}>{CATEGORY_LABEL[k]}</span>
+                  </button>
+                )
+              })}
+            </div>
+          )}
+
+        <Field label="Зачем? Родитель увидит" value={comment} onChange={setComment} placeholder="Например, на экскурсию" />
+        <Btn icon="chat" onClick={async () => {
+          const cents = toCents(amount)
+          if (type !== 'category_unlock' && !(cents > 0)) { toast('Укажите сумму'); return }
+          await api.createRequest({
+            type,
+            amount_cents: type === 'category_unlock' ? undefined : cents,
+            category: type === 'category_unlock' ? category : undefined,
+            comment,
+          })
+          setComment(''); setAmount(''); await reload()
+          toast('Запрос отправлен родителю')
+        }}>Отправить запрос</Btn>
+
         <Section title="Мои запросы">
-          {!data?.items.length && <Empty text="Запросов пока нет" />}
-          {data?.items.map((r) => (
-            <Card key={r.id} className="flex items-center justify-between">
-              <div><div className="font-medium">{requestText(r)}</div>{r.comment && <div className="text-sm text-slate-500">«{r.comment}»</div>}</div>
-              <Chip tone={r.status === 'approved' ? 'green' : r.status === 'rejected' ? 'red' : 'amber'}>{r.status === 'approved' ? 'Одобрено' : r.status === 'rejected' ? 'Отказ' : 'Ждёт'}</Chip>
-            </Card>
-          ))}
+          {!data?.items.length
+            ? <Empty text="Запросов пока нет" icon="chat" />
+            : (
+              <Card className="divide-y divide-line p-0">
+                {data.items.map((r) => (
+                  <Row
+                    key={r.id} icon={REQ_ICON[r.type]} iconTone="gray" title={requestText(r)} sub={r.comment || undefined}
+                    right={<Badge tone={r.status === 'approved' ? 'solid' : r.status === 'rejected' ? 'redsoft' : 'sky'}>{r.status === 'approved' ? 'Одобрено' : r.status === 'rejected' ? 'Отказ' : 'Ждёт'}</Badge>}
+                  />
+                ))}
+              </Card>
+            )}
         </Section>
       </div>
     </>
@@ -165,42 +251,44 @@ export function ChildGoals({ meId }: { meId: number }) {
   const [target, setTarget] = useState('')
   const [dep, setDep] = useState<{ id: number; title: string } | null>(null)
   const [sum, setSum] = useState('')
-  if (!data) return <Loading />
+  if (!data) return <><Header title="Мои цели" /><Loading /></>
+  const saved = data.items.reduce((s, g) => s + g.saved_cents, 0)
   return (
     <>
-      <Header title="Мои цели" />
+      <Header title="Мои цели" subtitle={`Отложено ${money(saved)}`} />
       <div className="space-y-3 p-4">
-        <Btn onClick={() => setCreate(true)}>＋ Новая цель</Btn>
-        {!data.items.length && <Empty text="Поставьте первую цель — например, на велосипед" />}
+        <Btn icon="plus" onClick={() => setCreate(true)}>Новая цель</Btn>
+        {!data.items.length && <Empty text="Поставь первую цель — например, на велосипед" icon="target" />}
         {data.items.map((g) => (
           <GoalCard key={g.id} g={g}>
-            {g.status === 'active' && <Btn small tone="ghost" onClick={() => setDep({ id: g.id, title: g.title })}>Отложить деньги</Btn>}
+            {g.status === 'active' && <Btn small tone="secondary" icon="plus" onClick={() => setDep({ id: g.id, title: g.title })}>Отложить</Btn>}
           </GoalCard>
         ))}
       </div>
 
       <Sheet open={create} onClose={() => setCreate(false)} title="Новая цель">
-        <div className="space-y-3">
+        <div className="space-y-4">
           <Field label="На что копим" value={title} onChange={setTitle} placeholder="Велосипед" />
-          <Field label="Сколько нужно, BYN" inputMode="decimal" value={target} onChange={setTarget} />
+          <Field label="Сколько нужно" inputMode="decimal" value={target} onChange={setTarget} placeholder="0" suffix="BYN" />
           <Btn onClick={async () => {
             const c = toCents(target)
             if (!title.trim() || !(c > 0)) { toast('Заполните название и сумму'); return }
             await api.createGoal(title, c)
             setCreate(false); setTitle(''); setTarget(''); await reload()
-          }}>Создать</Btn>
+          }}>Создать цель</Btn>
         </div>
       </Sheet>
 
       <Sheet open={!!dep} onClose={() => setDep(null)} title={dep ? `В цель «${dep.title}»` : ''}>
-        <div className="space-y-3">
-          <Field label="Сумма, BYN" inputMode="decimal" value={sum} onChange={setSum} />
+        <div className="space-y-4">
+          <Field label="Сумма" inputMode="decimal" value={sum} onChange={setSum} placeholder="0" suffix="BYN" />
           <Btn onClick={async () => {
             const c = toCents(sum)
             if (!dep || !(c > 0)) { toast('Укажите сумму'); return }
             await api.depositGoal(dep.id, c)
-            setDep(null); setSum(''); await reload(); toast('Отложено')
-          }}>Отложить</Btn>
+            setDep(null); setSum(''); await reload()
+            toast('Отложено')
+          }}>Отложить с карты</Btn>
         </div>
       </Sheet>
     </>
@@ -210,16 +298,21 @@ export function ChildGoals({ meId }: { meId: number }) {
 // ───────── Задания ─────────
 export function ChildTasks() {
   const { data, reload } = useData(() => api.listTasks(), [], 3000)
-  if (!data) return <Loading />
+  if (!data) return <><Header title="Задания" /><Loading /></>
+  const fresh = data.items.filter((t) => t.status === 'new').length
   return (
     <>
-      <Header title="Задания" />
+      <Header title="Задания" subtitle={fresh ? `Новых: ${fresh}` : 'Выполняй и получай награду'} />
       <div className="space-y-3 p-4">
-        {!data.items.length && <Empty text="Родитель пока не дал заданий" />}
+        {!data.items.length && <Empty text="Родитель пока не дал заданий" icon="tasks" />}
         {data.items.map((t) => (
-          <Card key={t.id} className="space-y-2">
+          <Card key={t.id}>
             <TaskHead t={t} />
-            {t.status === 'new' && <Btn small onClick={async () => { await api.taskDone(t.id); await reload(); toast('Отправлено родителю на проверку') }}>Я сделал(а)</Btn>}
+            {t.status === 'new' && (
+              <div className="mt-4">
+                <Btn small icon="check" onClick={async () => { await api.taskDone(t.id); await reload(); toast('Отправлено родителю на проверку') }}>Я сделал(а)</Btn>
+              </div>
+            )}
           </Card>
         ))}
       </div>
@@ -227,31 +320,30 @@ export function ChildTasks() {
   )
 }
 
-// ───────── Уровень доверия ─────────
+// ───────── Уровень ─────────
 export function ChildLevel({ meId }: { meId: number }) {
-  const { data } = useData(() => api.getLevel(meId), [meId], 2000)
-  if (!data) return <Loading />
-  const total = data.xp + data.xp_to_next
+  const { data: c } = useData(() => api.getChild(meId), [meId], 2000)
+  if (!c) return <><Header title="Мой уровень" /><Loading /></>
+  const lv = c.level
   return (
     <>
-      <Header title="Уровень доверия" />
-      <div className="space-y-4 p-4">
-        <Card className="space-y-2 text-center">
-          <div className="text-5xl">🏆</div>
-          <div className="text-2xl font-bold">Уровень {data.level}</div>
-          <Progress value={data.xp} max={total} />
-          <div className="text-sm text-slate-500">{data.xp_to_next > 0 ? `${data.xp} XP · до следующего ${data.xp_to_next}` : `${data.xp} XP · максимум`}</div>
+      <Header title="Мой уровень" subtitle="Расти вместе с картой" tall />
+      <div className="-mt-12 space-y-5 px-4 pb-6">
+        <Card className="flex flex-col items-center py-6 text-center shadow-[0_12px_32px_-16px_rgba(20,20,22,0.35)]">
+          <LevelRing level={lv} />
+          <div className="mt-3 text-sm tabular-nums text-muted">
+            {lv.xp} XP · {lv.xp_to_next > 0 ? `ещё ${lv.xp_to_next} до уровня ${lv.level + 1}` : 'максимальный уровень'}
+          </div>
         </Card>
-        {data.suggestion && <div className="rounded-xl bg-moby-50 p-3 text-sm text-moby-900">Мы предложили родителю: «{data.suggestion.text}»</div>}
-        <Section title="Уже открыто">
-          <Card className="space-y-1">{data.unlocked.length ? data.unlocked.map((u) => <div key={u}>✅ {u}</div>) : <div className="text-slate-400">Пока ничего</div>}</Card>
+
+        <Section title="Как расти">
+          <Card className="divide-y divide-line p-0">
+            <Row icon="tasks" title="Выполняй задания" sub="За каждое — награда и опыт" />
+            <Row icon="target" title="Копи на цели" sub="Родитель может добавить бонус" />
+            <Row icon="shield" title="Трать с умом" sub="Укладывайся в дневной лимит" />
+            <Row icon="arrow-up" title="В 18 лет" sub="Карта станет взрослой, история останется" />
+          </Card>
         </Section>
-        {data.next_unlocks.length > 0 && (
-          <Section title="Откроется дальше">
-            <Card className="space-y-1">{data.next_unlocks.map((u) => <div key={u} className="text-slate-600">🔒 {u}</div>)}</Card>
-          </Section>
-        )}
-        <p className="px-1 text-xs text-slate-400">Выполняй задания и трать разумно — опыт растёт, а родитель открывает больше возможностей. В 18 лет карта становится взрослой.</p>
       </div>
     </>
   )

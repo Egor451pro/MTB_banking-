@@ -18,9 +18,9 @@ function ParentShell() {
   const fam = useData(() => api.getFamily(), [], 3000)
   const pending = fam.data?.children.reduce((s, c) => s + c.pending_requests, 0) ?? 0
   const tabs: TabDef[] = [
-    { id: 'home', label: 'Главная', icon: '🏠' },
-    { id: 'requests', label: 'Запросы', icon: '🔔', badge: pending },
-    { id: 'tasks', label: 'Задания', icon: '✅' },
+    { id: 'home', label: 'Семья', icon: 'home' },
+    { id: 'requests', label: 'Запросы', icon: 'bell', badge: pending },
+    { id: 'tasks', label: 'Задания', icon: 'tasks' },
   ]
   const top = stack[stack.length - 1]
   let body
@@ -40,11 +40,11 @@ function ParentShell() {
 function ChildShell({ me }: { me: Me }) {
   const { tab, setTab, stack } = useNav()
   const tabs: TabDef[] = [
-    { id: 'home', label: 'Главная', icon: '🏠' },
-    { id: 'pay', label: 'Оплата', icon: '💳' },
-    { id: 'goals', label: 'Цели', icon: '🎯' },
-    { id: 'tasks', label: 'Задания', icon: '✅' },
-    { id: 'level', label: 'Уровень', icon: '🏆' },
+    { id: 'home', label: 'Главная', icon: 'home' },
+    { id: 'pay', label: 'Оплата', icon: 'card' },
+    { id: 'goals', label: 'Цели', icon: 'target' },
+    { id: 'tasks', label: 'Задания', icon: 'tasks' },
+    { id: 'level', label: 'Уровень', icon: 'star' },
   ]
   const top = stack[stack.length - 1]
   let body
@@ -64,7 +64,12 @@ function ChildShell({ me }: { me: Me }) {
 
 function Phone({ uid }: { uid: number }) {
   const [me, setMe] = useState<Me | null>(null)
-  useEffect(() => { session.userId = uid; api.getMe().then(setMe) }, [uid])
+  const [err, setErr] = useState<string | null>(null)
+  useEffect(() => {
+    session.userId = uid
+    api.getMe().then(setMe).catch((e: Error) => setErr(e.message))
+  }, [uid])
+  if (err) return <div className="p-6 text-center text-sm text-mt-red">Не удалось войти: {err}</div>
   if (!me) return <Loading />
   return (
     <NavProvider initialTab="home">
@@ -75,17 +80,24 @@ function Phone({ uid }: { uid: number }) {
 
 export default function App() {
   const [uid, setUid] = useState(1)
-  // session.userId выставляется до рендера дочерних экранов
+  // session.userId выставляется до рендера экранов, чтобы первый запрос ушёл от нужного пользователя
   session.userId = uid
   return (
-    <div className="flex min-h-screen flex-col items-center gap-3 px-2 py-3">
-      <div className="flex items-center gap-2 text-sm">
-        <span className="text-slate-500">Демо-вход{usingMock ? ' (mock)' : ''}:</span>
-        {DEMO_USERS.map((u) => (
-          <button key={u.id} onClick={() => setUid(u.id)} className={`rounded-full px-3 py-1 ${uid === u.id ? 'bg-moby-600 text-white' : 'bg-white text-slate-600'}`}>{u.label}</button>
-        ))}
+    <div className="flex min-h-[100dvh] flex-col items-center sm:gap-4 sm:py-5">
+      <div className="flex w-full items-center justify-center gap-2 bg-white px-3 py-2 sm:w-auto sm:rounded-full sm:py-1.5 sm:pl-4 sm:shadow-sm">
+        <span className="text-xs font-semibold text-muted">Демо{usingMock ? ' · mock' : ''}</span>
+        <div className="flex rounded-full bg-[#EEF1F5] p-0.5">
+          {DEMO_USERS.map((u) => (
+            <button
+              key={u.id} onClick={() => setUid(u.id)}
+              className={`rounded-full px-3 py-1 text-[13px] font-semibold transition ${uid === u.id ? 'bg-mt-blue text-white' : 'text-muted'}`}
+            >
+              {u.label}
+            </button>
+          ))}
+        </div>
       </div>
-      <div className="relative flex h-[min(820px,calc(100vh-70px))] w-full max-w-[430px] flex-col overflow-hidden rounded-[28px] bg-bg shadow-2xl">
+      <div className="relative flex h-[calc(100dvh-44px)] w-full flex-col overflow-hidden bg-mt-cloud sm:h-[min(820px,calc(100dvh-90px))] sm:max-w-[400px] sm:rounded-[36px] sm:border-[7px] sm:border-mt-ink sm:shadow-2xl">
         <ToastHost />
         <Phone key={uid} uid={uid} />
       </div>
