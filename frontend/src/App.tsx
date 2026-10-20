@@ -127,8 +127,8 @@ function IPhoneFrame({ children }: { children: ReactNode }) {
 
       <div className="relative flex min-h-0 flex-1 flex-col overflow-hidden bg-[#F2F2F7] sm:rounded-[44px]">
         {/* Статус-бар + статичный Dynamic Island */}
-        <div className="pointer-events-none absolute inset-x-0 top-0 z-30 flex h-[54px] items-end justify-between px-[28px] pb-[11px] text-[15px] font-semibold tracking-[-0.03em] text-white">
-          <span className="min-w-[54px] pl-0.5 tabular-nums leading-none">{time}</span>
+        {/* Статус-бар + статичный Dynamic Island (только для ПК) */}
+        <div className="pointer-events-none absolute inset-x-0 top-0 z-30 hidden h-[54px] items-end justify-between px-[28px] pb-[11px] text-[15px] font-semibold tracking-[-0.03em] text-white sm:flex">          <span className="min-w-[54px] pl-0.5 tabular-nums leading-none">{time}</span>
 
           <div className="absolute left-1/2 top-[12px] h-[37px] w-[126px] -translate-x-1/2 rounded-full bg-black">
             <div className="absolute left-[22%] top-1/2 h-[9px] w-[9px] -translate-y-1/2 rounded-full bg-[#1a1a1a] ring-1 ring-[#2a2a2a]" />
