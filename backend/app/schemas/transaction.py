@@ -42,3 +42,19 @@ class TransactionItem(BaseModel):
 
 class TransactionsResponse(BaseModel):
     items: List[TransactionItem]
+
+
+class PendingPurchaseItem(TransactionItem):
+    child_id: int
+    child_name: str
+
+
+class PendingPurchasesResponse(BaseModel):
+    items: List[PendingPurchaseItem]
+
+
+class PurchaseDecisionResponse(BaseModel):
+    id: int
+    status: PaymentStatus
+    balance_cents: int
+    message: str
