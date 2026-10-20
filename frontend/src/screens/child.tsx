@@ -8,8 +8,48 @@ import {
   Avatar, BalanceCard, Badge, Btn, Card, Empty, Field, Header, IconTile, Loading, Note, Progress,
   Row, Section, Sheet, toast,
 } from '../ui'
-import type { Category, DeclineReason, LessonResult, PayResult, PermissionKey, ReqType } from '../types'
+import type { Category, DeclineReason, Lesson, LessonResult, LessonVideo, PayResult, PermissionKey, ReqType } from '../types'
 import { GoalCard, LevelRing, REQ_ICON, TaskHead, TxList, requestText } from './shared'
+
+// Видео-урок. Если файла нет или он не грузится — показываем заглушку с текстом.
+function VideoPlayer({ v }: { v: LessonVideo }) {
+  const [failed, setFailed] = useState(false)
+  return (
+    <div className="overflow-hidden rounded-[20px] bg-white">
+      {failed ? (
+        <div className="flex aspect-video flex-col items-center justify-center gap-2 bg-gradient-to-br from-[#2B5FDB] to-[#6AA6F3] px-6 text-center text-white">
+          <Icon name="play" size={36} />
+          <div className="text-sm font-semibold">Видео скоро появится</div>
+        </div>
+      ) : (
+        <video
+          className="aspect-video w-full bg-black" src={v.url} controls playsInline preload="metadata"
+          onError={() => setFailed(true)}
+        />
+      )}
+      <div className="space-y-1.5 p-3.5">
+        <div className="flex items-center gap-2"><Badge tone="blue">{v.seconds} сек</Badge><span className="text-xs text-muted">Видео создано с помощью ИИ</span></div>
+        <p className="text-[13px] leading-snug text-muted">{v.captions}</p>
+      </div>
+    </div>
+  )
+}
+
+// Подсказка «посмотри видео» в подходящий момент. Не блокирует действия.
+function LessonNudge({ lesson, text }: { lesson?: Lesson; text: string }) {
+  const { push } = useNav()
+  if (!lesson || lesson.completed || !lesson.video) return null
+  return (
+    <Card onClick={() => push({ name: 'lesson', params: { id: lesson.id } })} className="flex items-center gap-3">
+      <IconTile name="play" tone="blue" />
+      <div className="min-w-0 flex-1">
+        <div className="text-[15px] font-semibold text-mt-ink">{text}</div>
+        <div className="text-xs text-muted">Видео {lesson.video.seconds} сек · +{lesson.points_reward} баллов за вопрос</div>
+      </div>
+      <Icon name="chevron-right" size={18} className="text-[#A3ABB8]" />
+    </Card>
+  )
+}
 
 // ───────── Главная ребёнка ─────────
 export function ChildHome({ meId }: { meId: number }) {
@@ -86,6 +126,7 @@ export function ChildPay({ meId }: { meId: number }) {
   const { push } = useNav()
   const { data: c, reload } = useData(() => api.getChild(meId), [meId])
   const [res, setRes] = useState<{ m: Merchant; r: PayResult } | null>(null)
+  const lessons = useData(() => api.getLessons(), [], 5000)
   if (!c) return <><Header title="Оплата" /><Loading /></>
 
   async function pay(m: Merchant) {
@@ -150,7 +191,10 @@ export function ChildPay({ meId }: { meId: number }) {
             <div className="mt-1 text-[15px] text-muted">{res.m.name} · <span className="tabular-nums">{money(res.m.cents)}</span></div>
             <div className="mt-4 w-full rounded-xl bg-[#F3F6FA] px-4 py-3 text-sm text-mt-ink">{res.r.message}</div>
             <div className="mt-5 w-full space-y-2">
-              {ask && <Btn icon="chat" onClick={() => { const a = ask; setRes(null); push({ name: 'request', params: a }) }}>Попросить у родителя</Btn>}
+              {(res.r.decline_reason === 'insufficient_funds' || res.r.decline_reason === 'limit_exceeded') && lessons.data?.items.find((l) => l.id === 5 && !l.completed) && (
+                <Btn tone="ghost" icon="play" onClick={() => { setRes(null); push({ name: 'lesson', params: { id: 5 } }) }}>Почему не хватило? Видео 40 сек</Btn>
+              )}
+              {ask && <Btn icon="chat"onClick={() => { const a = ask; setRes(null); push({ name: 'request', params: a }) }}>Попросить у родителя</Btn>}
               <Btn tone="secondary" onClick={() => setRes(null)}>Готово</Btn>
             </div>
           </div>
@@ -283,6 +327,7 @@ export function ChildGoals({ meId }: { meId: number }) {
   const { push } = useNav()
   const { data, reload } = useData(() => api.getGoals(meId), [meId], 3000)
   const perms = useData(() => api.getPermissions(meId), [meId], 3000)
+  const lessons = useData(() => api.getLessons(), [], 5000)
   const [create, setCreate] = useState(false)
   const [title, setTitle] = useState('')
   const [target, setTarget] = useState('')
@@ -302,6 +347,7 @@ export function ChildGoals({ meId }: { meId: number }) {
             </>
           )
           : <Btn icon="plus" onClick={() => setCreate(true)}>Новая цель</Btn>}
+        <LessonNudge lesson={lessons.data?.items.find((l) => l.id === 2)} text="Как копить на цель" />
         {!data.items.length && <Empty text="Поставь первую цель — например, на велосипед" icon="target" />}
         {data.items.map((g) => (
           <GoalCard key={g.id} g={g}>
@@ -403,6 +449,10 @@ export function ChildLevel({ meId }: { meId: number }) {
           </Card>
         </Section>
 
+        {perms.data?.items.find((p) => p.key === 'online_payments')?.enabled && (
+          <LessonNudge lesson={lessons.data?.items.find((l) => l.id === 3)} text="Перед онлайн-покупками: осторожно, мошенники" />
+        )}
+
         <Section title="Мои возможности">
           <Card className="divide-y divide-line p-0">
             {(perms.data?.items ?? []).map((p) => {
@@ -439,6 +489,7 @@ export function LessonScreen({ id }: { id: number }) {
     <>
       <Header title={lesson.title} subtitle={lesson.description} onBack={back} />
       <div className="space-y-4 p-4">
+        {lesson.video && <VideoPlayer v={lesson.video} />}
         <Card className="space-y-3">
           {lesson.content.map((p, i) => <p key={i} className="text-[15px] leading-relaxed text-mt-ink">{p}</p>)}
         </Card>
