@@ -32,7 +32,9 @@ export default {
         'tint-red': 'rgb(var(--tint-red) / <alpha-value>)',
       },
       fontFamily: {
-        sans: ['Onest', 'Inter', 'system-ui', '-apple-system', 'Segoe UI', 'Roboto', 'sans-serif'],
+        // Фирменная пара Moby: Inter — основной текст, TikTok Sans — акцентный шрифт (заголовки, крупные суммы)
+        sans: ['Inter', 'system-ui', '-apple-system', 'Segoe UI', 'Roboto', 'sans-serif'],
+        display: ['"TikTok Sans"', 'Inter', 'system-ui', '-apple-system', 'Segoe UI', 'Roboto', 'sans-serif'],
       },
     },
   },

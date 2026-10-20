@@ -105,7 +105,7 @@ export function ParentProducts() {
           <div className="absolute -left-10 -top-16 h-40 w-40 rounded-full bg-white/10 blur-2xl" />
           <div className="relative z-10 max-w-[58%]">
             <div className="text-xs font-semibold uppercase tracking-wider text-white/75">Новое в Moby</div>
-            <div className="mt-1 text-[26px] font-extrabold leading-none tracking-tight">Детская карта</div>
+            <div className="mt-1 font-display text-[26px] font-extrabold leading-none tracking-tight">Детская карта</div>
             <div className="mt-2 text-sm font-medium leading-snug text-white/90">с 7 лет — под вашим контролем</div>
           </div>
           <div className="absolute -right-5 top-7 h-[96px] w-[150px] rotate-[-12deg] rounded-[14px] bg-gradient-to-br from-mt-red to-mt-orange shadow-[0_18px_30px_-10px_rgba(0,0,0,0.45)]">

@@ -2,6 +2,11 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Акцентный шрифт Moby (TikTok Sans) — для заголовков и крупных сумм, остальное набрано Inter */
+@layer base {
+  h1, h2, h3 { @apply font-display; }
+}
+
 /* ───────── Тема: светлая / тёмная ─────────
    RGB-каналы, чтобы работали bg-card/80 и подобные. */
 :root {

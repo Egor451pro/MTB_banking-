@@ -363,8 +363,8 @@ export function MoneyBig({ cents, muted }: { cents: number; muted?: boolean }) {
   const i = s.indexOf(',')
   return (
     <span className={`tabular-nums ${muted ? 'text-[#A3ABB8]' : 'text-mt-ink'}`}>
-      <span className="text-[30px] font-bold tracking-tight">{s.slice(0, i)}</span>
-      <span className="text-[18px] font-semibold text-muted">{s.slice(i)}</span>
+      <span className="font-display text-[30px] font-bold tracking-tight">{s.slice(0, i)}</span>
+      <span className="font-display text-[18px] font-semibold text-muted">{s.slice(i)}</span>
     </span>
   )
 }

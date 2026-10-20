@@ -144,7 +144,7 @@ export function LoyaltyScreen({ onBack }: { onBack?: () => void }) {
           <IconTile name="coins" tone="solid" size={52} />
           <div>
             <div className="text-xs font-semibold uppercase tracking-wide text-[#A3ABB8]">Мои баллы</div>
-            <div className="text-[30px] font-bold tabular-nums tracking-tight text-mt-ink">{data.points.toLocaleString('ru-RU')}</div>
+            <div className="font-display text-[30px] font-bold tabular-nums tracking-tight text-mt-ink">{data.points.toLocaleString('ru-RU')}</div>
           </div>
         </div>
 
@@ -194,7 +194,7 @@ export function LoyaltyScreen({ onBack }: { onBack?: () => void }) {
         {code && (
           <div className="space-y-4 text-center">
             <div className="text-[15px] text-muted">{code.title}</div>
-            <div className="rounded-2xl bg-elevated py-5 text-3xl font-bold tracking-[0.15em] text-mt-ink">{code.code}</div>
+            <div className="rounded-2xl bg-elevated py-5 font-display text-3xl font-bold tracking-[0.15em] text-mt-ink">{code.code}</div>
             <div className="text-sm text-muted">Покажите код у партнёра</div>
             <Btn onClick={() => setCode(null)}>Готово</Btn>
           </div>
