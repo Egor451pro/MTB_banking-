@@ -319,6 +319,18 @@ async def seed_data():
                 decline_reason=None,
                 created_at=minutes_ago(60 * 1)
             ),
+            # Крупная онлайн-покупка ждёт подтверждения мамы (демо «Запросы»)
+            Transaction(
+                account_id=anya_card.id,
+                amount_cents=2500,
+                direction=TransactionDirection.OUT,
+                category="shopping",
+                merchant="Магазин одежды",
+                is_online=True,
+                status=TransactionStatus.PENDING,
+                decline_reason=None,
+                created_at=minutes_ago(40)
+            ),
         ]
         
         for tx in transactions_misha + transactions_anya:
