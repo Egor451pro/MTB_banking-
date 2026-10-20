@@ -526,6 +526,9 @@ function GoalsParent({ childId }: { childId: number }) {
   if (!data.items.length) return <Empty text="Ребёнок пока не поставил цель" icon="target" />
   return (
     <>
+      <Note icon="gift">
+        Бонус добавляется сразу при каждом взносе ребёнка. В этом месяце ещё можно добавить {money(data.bonus_month_left_cents)} из {money(data.bonus_month_cap_cents)}
+      </Note>
       {data.items.map((g) => (
         <GoalCard key={g.id} g={g}>
           <div className="mb-2 text-[13px] font-medium text-muted">Ваш бонус к накоплениям</div>

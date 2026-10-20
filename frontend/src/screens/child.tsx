@@ -286,7 +286,7 @@ export function ChildGoals({ meId }: { meId: number }) {
   const [create, setCreate] = useState(false)
   const [title, setTitle] = useState('')
   const [target, setTarget] = useState('')
-  const [dep, setDep] = useState<{ id: number; title: string } | null>(null)
+  const [dep, setDep] = useState<{ id: number; title: string; percent: number } | null>(null)
   const [sum, setSum] = useState('')
   if (!data) return <><Header title="Мои цели" /><Loading /></>
   const saved = data.items.reduce((s, g) => s + g.saved_cents, 0)
@@ -305,7 +305,7 @@ export function ChildGoals({ meId }: { meId: number }) {
         {!data.items.length && <Empty text="Поставь первую цель — например, на велосипед" icon="target" />}
         {data.items.map((g) => (
           <GoalCard key={g.id} g={g}>
-            {g.status === 'active' && <Btn small tone="secondary" icon="plus" onClick={() => setDep({ id: g.id, title: g.title })}>Отложить</Btn>}
+            {g.status === 'active' && <Btn small tone="secondary" icon="plus" onClick={() => setDep({ id: g.id, title: g.title, percent: g.parent_bonus_percent })}>Отложить</Btn>}
           </GoalCard>
         ))}
       </div>
@@ -326,12 +326,25 @@ export function ChildGoals({ meId }: { meId: number }) {
       <Sheet open={!!dep} onClose={() => setDep(null)} title={dep ? `В цель «${dep.title}»` : ''}>
         <div className="space-y-4">
           <Field label="Сумма" inputMode="decimal" value={sum} onChange={setSum} placeholder="0" suffix="BYN" />
+          {dep && dep.percent > 0 && (() => {
+            // Показываем, сколько добавит родитель, ещё до нажатия кнопки
+            const c = toCents(sum)
+            const left = data.bonus_month_left_cents
+            const bonus = c > 0 ? Math.min(Math.floor((c * dep.percent) / 100), left) : 0
+            return (
+              <Note icon="gift">
+                {left <= 0
+                  ? 'Бонус родителя в этом месяце закончился, взнос пройдёт без него'
+                  : bonus > 0 ? `Родитель добавит +${money(bonus)} (бонус +${dep.percent}%)` : `Родитель добавит +${dep.percent}% к каждому взносу`}
+              </Note>
+            )
+          })()}
           <Btn onClick={async () => {
             const c = toCents(sum)
             if (!dep || !(c > 0)) { toast('Укажите сумму'); return }
-            await api.depositGoal(dep.id, c)
+            const r = await api.depositGoal(dep.id, c)
             setDep(null); setSum(''); await reload()
-            toast('Отложено')
+            toast(r.bonus_cents > 0 ? `Отложено + ${money(r.bonus_cents)} бонус от родителя` : 'Отложено')
           }}>Отложить с карты</Btn>
         </div>
       </Sheet>

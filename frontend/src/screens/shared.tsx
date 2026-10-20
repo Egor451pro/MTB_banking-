@@ -61,10 +61,11 @@ export function GoalCard({ g, children }: { g: Goal; children?: ReactNode }) {
         </div>
       </div>
       <div className="mt-3"><Progress value={g.saved_cents} max={g.target_cents} /></div>
-      {(done || g.parent_bonus_percent > 0) && (
+      {(done || g.parent_bonus_percent > 0 || !!g.bonus_cents) && (
         <div className="mt-3 flex flex-wrap gap-2">
           {done && <Badge tone="solid">Цель достигнута</Badge>}
           {g.parent_bonus_percent > 0 && <Badge tone="blue">Бонус родителя +{g.parent_bonus_percent}%</Badge>}
+          {!!g.bonus_cents && <Badge tone="solid">Получено бонусов {money(g.bonus_cents)}</Badge>}
         </div>
       )}
       {children && <div className="mt-3 border-t border-line pt-3">{children}</div>}

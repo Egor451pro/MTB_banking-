@@ -194,6 +194,17 @@ class Goal(Base):
     child: Mapped["User"] = relationship("User", back_populates="goals")
 
 
+class GoalBonus(Base):
+    """Бонус родителя, начисленный при взносе в цель. Журнал нужен для месячного лимита."""
+    __tablename__ = "goal_bonuses"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    goal_id: Mapped[int] = mapped_column(ForeignKey("goals.id"), nullable=False)
+    child_id: Mapped[int] = mapped_column(ForeignKey("users.id"), nullable=False)
+    amount_cents: Mapped[int] = mapped_column(Integer, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+
+
 class Task(Base):
     """Задание от родителя ребенку"""
     __tablename__ = "tasks"

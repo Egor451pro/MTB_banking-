@@ -1,5 +1,5 @@
 import type {
-  AccessRequest, Allowance, ApproveResult, Category, ChildDetail, FamilyResp, Goal, Lesson, LessonResult,
+  AccessRequest, Allowance, ApproveResult, Category, ChildDetail, DepositResult, FamilyResp, Goal, GoalsResp, Lesson, LessonResult,
   LevelInfo, LimitItem, LoyaltyInfo, Me, PackageReq, PayRequest, PayResult, PendingPurchase, Permission,
   PermissionKey, ReqStatus, ReqType, Task, Transaction,
 } from '../types'
@@ -27,8 +27,8 @@ export interface Api {
   approveRequest(id: number): Promise<{ id: number; status: string }>
   rejectRequest(id: number): Promise<{ id: number; status: string }>
   createGoal(title: string, targetCents: number): Promise<Goal>
-  getGoals(childId: number): Promise<{ items: Goal[] }>
-  depositGoal(id: number, amountCents: number): Promise<{ saved_cents: number; card_balance_cents: number; status: string }>
+  getGoals(childId: number): Promise<GoalsResp>
+  depositGoal(id: number, amountCents: number): Promise<DepositResult>
   setGoalBonus(id: number, percent: number): Promise<{ parent_bonus_percent: number }>
   createTask(req: { assigned_to: number; title: string; reward_cents: number; xp_reward: number; due_date?: string }): Promise<{ id: number; status: string }>
   listTasks(childId?: number): Promise<{ items: Task[] }>

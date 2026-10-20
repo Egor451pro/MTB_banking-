@@ -28,9 +28,14 @@ interface DB {
   perms: Record<number, Record<PermissionKey, boolean>> // права ребёнка в Moby
   allowance: Record<number, Omit<Allowance, 'next_date'>>
   lessonsDone: Record<number, number[]>
+  bonusMonth: Record<number, { month: string; spent: number }>  // сколько бонуса родителя начислено ребёнку в месяце
   accepted: Record<number, boolean>    // принято ли предложение уровня
   seq: { tx: number; req: number; goal: number; task: number; user: number; acc: number }
 }
+
+// Бонус родителя к накоплениям: не больше 10 BYN в месяц на ребёнка (как на бэкенде)
+const BONUS_MONTH_CAP = 1000
+const monthKey = () => new Date().toISOString().slice(0, 7)
 
 // Уроки финансовой грамотности: правильный ответ знает только «сервер»
 const LESSONS: (Omit<Lesson, 'completed'> & { answer: number; explanation: string })[] = [
@@ -150,6 +155,7 @@ function seed(): DB {
     allowance: { 2: { amount_cents: 1000, period: 'week', active: true }, 3: { amount_cents: 2000, period: 'week', active: true } },
     lessonsDone: { 3: [1, 3] },
     accepted: {},
+    bonusMonth: {},
     seq: { tx: 6, req: 1, goal: 1, task: 2, user: 3, acc: 11 },
   }
 }
@@ -161,6 +167,12 @@ class MockError extends Error {
 
 export function mockApi(): Api {
   let db = seed()
+  // Сколько бонуса родителя ещё можно начислить ребёнку в этом месяце
+  function bonusLeft(childId: number): number {
+    const b = db.bonusMonth[childId]
+    const spent = b && b.month === monthKey() ? b.spent : 0
+    return Math.max(0, BONUS_MONTH_CAP - spent)
+  }
 
   const user = (id: number) => {
     const u = db.users.find((x) => x.id === id)
@@ -437,7 +449,11 @@ export function mockApi(): Api {
 
     async getGoals(childId) {
       access(childId)
-      return delay({ items: db.goals.filter((g) => g.child_id === childId).map(({ child_id: _c, ...g }) => g) })
+      return delay({
+        items: db.goals.filter((g) => g.child_id === childId).map(({ child_id: _c, ...g }) => g),
+        bonus_month_cap_cents: BONUS_MONTH_CAP,
+        bonus_month_left_cents: bonusLeft(childId),
+      })
     },
 
     async depositGoal(id, amount) {
@@ -447,10 +463,15 @@ export function mockApi(): Api {
       const a = card(c.id)
       if (!(amount > 0)) throw new MockError('validation_error', 'Сумма должна быть больше нуля')
       if (a.balance_cents < amount) throw new MockError('validation_error', 'На карте не хватает денег')
+      // Бонус родителя начисляется сразу: процент от взноса, но не больше остатка лимита месяца
+      const left = bonusLeft(c.id)
+      const bonus = Math.min(Math.floor((amount * g.parent_bonus_percent) / 100), left)
       a.balance_cents -= amount
-      g.saved_cents += amount
+      g.saved_cents += amount + bonus
+      g.bonus_cents = (g.bonus_cents ?? 0) + bonus
+      if (bonus > 0) db.bonusMonth[c.id] = { month: monthKey(), spent: BONUS_MONTH_CAP - left + bonus }
       if (g.saved_cents >= g.target_cents) g.status = 'done'
-      return delay({ saved_cents: g.saved_cents, card_balance_cents: a.balance_cents, status: g.status })
+      return delay({ saved_cents: g.saved_cents, card_balance_cents: a.balance_cents, bonus_cents: bonus, bonus_left_cents: left - bonus, status: g.status })
     },
 
     async setGoalBonus(id, percent) {

@@ -20,7 +20,7 @@ from app.db import AsyncSessionLocal, Base, engine
 from app.models import (
     Family, User, UserRole, Account, AccountType, AccountStatus,
     Limit, LimitPeriod, Transaction, TransactionDirection, TransactionStatus,
-    Consent, Goal, GoalStatus, Task, TaskStatus, AccessRequest, RequestStatus, RequestType,
+    Consent, Goal, GoalBonus, GoalStatus, Task, TaskStatus, AccessRequest, RequestStatus, RequestType,
     Allowance, Lesson, LessonProgress,
 )
 
@@ -34,6 +34,7 @@ async def clear_all_tables(session):
     await session.execute(delete(Lesson))
     await session.execute(delete(AccessRequest))
     await session.execute(delete(Task))
+    await session.execute(delete(GoalBonus))
     await session.execute(delete(Goal))
     await session.execute(delete(Transaction))
     await session.execute(delete(Limit))
