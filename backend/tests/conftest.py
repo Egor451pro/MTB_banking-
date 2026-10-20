@@ -135,3 +135,9 @@ async def seed_test_data(prepare_db: None) -> dict[str, int]:
         "family2_parent_id": 3,
         "family2_child_id": 4,
     }
+
+
+@pytest_asyncio.fixture(scope="function")
+async def db_session(prepare_db: None) -> AsyncGenerator[AsyncSession, None]:
+    async with TestingSessionLocal() as session:
+        yield session
