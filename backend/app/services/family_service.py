@@ -178,6 +178,11 @@ class FamilyService:
 
         for consent in request.consents:
             db.add(Consent(child_id=child.id, consent_type=consent))
+        await db.flush()
+
+        from app.services.permission_service import PermissionService
+
+        await PermissionService.grant_defaults(db, child)
 
         await db.flush()
         return CreatePackageResponse(

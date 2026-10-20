@@ -55,6 +55,7 @@ class RequestType(str, enum.Enum):
     MONEY = "money"
     LIMIT_INCREASE = "limit_increase"
     CATEGORY_UNLOCK = "category_unlock"
+    PRODUCT_ACCESS = "product_access"
 
 
 class RequestStatus(str, enum.Enum):
@@ -219,6 +220,7 @@ class AccessRequest(Base):
     type: Mapped[RequestType] = mapped_column(Enum(RequestType), nullable=False)
     amount_cents: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)  # Для money и limit_increase
     category: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)  # Для category_unlock
+    permission: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)  # Для product_access
     comment: Mapped[str] = mapped_column(Text, default="")
     status: Mapped[RequestStatus] = mapped_column(Enum(RequestStatus), default=RequestStatus.PENDING)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)

@@ -35,6 +35,7 @@ class RequestService:
             type=RequestType(request.type),
             amount_cents=request.amount_cents,
             category=request.category,
+            permission=request.permission,
             comment=request.comment,
             status=RequestStatus.PENDING,
         )
@@ -65,6 +66,7 @@ class RequestService:
                     type=req.type.value,
                     amount_cents=req.amount_cents,
                     category=req.category,
+                    permission=req.permission,
                     comment=req.comment,
                     status=req.status.value,
                     created_at=req.created_at,
@@ -132,6 +134,21 @@ class RequestService:
                     Limit.category == req.category,
                 )
             )
+        elif req.type == RequestType.PRODUCT_ACCESS:
+            from app.services.permission_service import PermissionService
+
+            if not req.permission:
+                raise HTTPException(
+                    status_code=422,
+                    detail={"error": "validation_error", "message": "Не указано право"},
+                )
+            locked = PermissionService.locked_reason(child, req.permission)
+            if locked:
+                raise HTTPException(
+                    status_code=403,
+                    detail={"error": "forbidden", "message": f"Нельзя включить: {locked.lower()}"},
+                )
+            await PermissionService.enable(db, child.id, req.permission)
 
         req.status = RequestStatus.APPROVED
         req.processed_at = datetime.utcnow()

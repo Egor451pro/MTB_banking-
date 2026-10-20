@@ -8,7 +8,7 @@ from datetime import datetime, timedelta, date
 from sqlalchemy import delete
 import pytz
 
-from app.db import AsyncSessionLocal, init_db
+from app.db import AsyncSessionLocal, Base, engine
 from app.models import (
     Family, User, UserRole, Account, AccountType, AccountStatus,
     Limit, LimitPeriod, Transaction, TransactionDirection, TransactionStatus,
@@ -42,8 +42,10 @@ async def seed_data():
     """Наполняет БД демо-данными"""
     print("🌱 Начинаем заполнение базы данных...")
     
-    # Инициализация БД (создание таблиц)
-    await init_db()
+    # Пересоздаём схему: seed полностью заменяет данные, так подхватываются новые колонки.
+    async with engine.begin() as conn:
+        await conn.run_sync(Base.metadata.drop_all)
+        await conn.run_sync(Base.metadata.create_all)
     
     async with AsyncSessionLocal() as session:
         # Очищаем таблицы
@@ -106,14 +108,19 @@ async def seed_data():
         # 3. Создаем согласия (consents)
         print("📝 Создаем согласия...")
         
-        # Для Миши (7-13 лет) - без онлайн-платежей
+        # Для Миши (7-13 лет) — без онлайн-платежей; права: goals, partner_offers
         session.add(Consent(child_id=misha.id, consent_type="card_issue"))
         session.add(Consent(child_id=misha.id, consent_type="moby_access"))
+        session.add(Consent(child_id=misha.id, consent_type="goals"))
+        session.add(Consent(child_id=misha.id, consent_type="partner_offers"))
         
-        # Для Ани (14-17 лет) - с онлайн-платежами
+        # Для Ани (14-17 лет): online_payments, goals, savings, partner_offers
         session.add(Consent(child_id=anya.id, consent_type="card_issue"))
         session.add(Consent(child_id=anya.id, consent_type="moby_access"))
         session.add(Consent(child_id=anya.id, consent_type="online_payments"))
+        session.add(Consent(child_id=anya.id, consent_type="goals"))
+        session.add(Consent(child_id=anya.id, consent_type="savings"))
+        session.add(Consent(child_id=anya.id, consent_type="partner_offers"))
         
         # 4. Создаем карты
         print("💳 Создаем карты...")

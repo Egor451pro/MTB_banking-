@@ -86,8 +86,10 @@ class PaymentService:
                 message=message,
             )
 
-        # 3) online_not_allowed
-        if request.is_online and not await UserService.has_online_payments_permission(db, child.id):
+        # 3) online_not_allowed — право online_payments в consents, с учётом возрастного замка
+        from app.services.permission_service import PermissionService
+
+        if request.is_online and not await PermissionService.is_enabled(db, child, "online_payments"):
             return await PaymentService._save_and_response(
                 db=db,
                 account=account,
