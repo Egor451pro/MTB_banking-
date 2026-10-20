@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+﻿import { useEffect, useState } from 'react'
 import { api } from '../api'
 import { CATEGORY_ICON, CATEGORY_LABEL, PERMISSION_INFO, REQ_SHORT, ageFrom, ageLabel, dateShort, dateTime, money, plural, toCents } from '../format'
 import { useData } from '../hooks'
@@ -100,7 +100,7 @@ export function ParentProducts() {
   const kids = fam.data?.children ?? []
   return (
     <div className="flex min-h-full flex-col">
-      <div className="flex-1 space-y-4 p-4 pt-6">
+      <div className="flex-1 space-y-4 p-4 pt-6 sm:pt-[80px]">
         <button onClick={() => push({ name: 'package' })} className="relative block h-[150px] w-full overflow-hidden rounded-[20px] bg-gradient-to-br from-mt-blue via-[#2B5FDB] to-[#6AA6F3] p-5 text-left text-white">
           <div className="absolute -left-10 -top-16 h-40 w-40 rounded-full bg-white/10 blur-2xl" />
           <div className="relative z-10 max-w-[58%]">
@@ -275,7 +275,7 @@ export function ChildManage({ id }: { id: number }) {
           <Field label="Сумма" inputMode="decimal" value={amount} onChange={setAmount} placeholder="0" suffix="BYN" />
           <div className="flex gap-2">
             {[5, 10, 20, 50].map((v) => (
-              <button key={v} onClick={() => setAmount(String(v))} className="h-9 flex-1 rounded-[10px] bg-[#E9F1FE] text-sm font-semibold text-[#2F6FE4]">{v} BYN</button>
+              <button key={v} onClick={() => setAmount(String(v))} className="h-9 flex-1 rounded-[10px] bg-tint text-sm font-semibold text-[#2F6FE4]">{v} BYN</button>
             ))}
           </div>
           <Btn onClick={async () => {
@@ -624,7 +624,7 @@ export function ParentRequests() {
               <Badge tone="sky"><Icon name={REQ_ICON[r.type]} size={14} />{REQ_SHORT[r.type]}</Badge>
             </div>
             <div className="mt-3 text-xl font-bold tracking-tight text-mt-ink">{requestText(r)}</div>
-            {r.comment && <div className="mt-2 rounded-xl bg-[#F3F5F8] px-3 py-2.5 text-sm text-mt-ink">«{r.comment}»</div>}
+            {r.comment && <div className="mt-2 rounded-xl bg-elevated px-3 py-2.5 text-sm text-mt-ink">«{r.comment}»</div>}
             <div className="mt-4 grid grid-cols-2 gap-2">
               <Btn small tone="danger" onClick={async () => { await api.rejectRequest(r.id); await reload(); toast('Запрос отклонён') }}>Отклонить</Btn>
               <Btn small onClick={async () => { await api.approveRequest(r.id); await reload(); toast('Одобрено') }}>Одобрить</Btn>

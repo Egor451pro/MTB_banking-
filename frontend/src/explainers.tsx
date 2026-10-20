@@ -1,4 +1,4 @@
-import { useEffect, useState, type ReactNode } from 'react'
+﻿import { useEffect, useState, type ReactNode } from 'react'
 import { Icon } from './icons'
 
 // Анимированные мини-мультфильмы для уроков. Нарисованы кодом (SVG + CSS),
@@ -213,7 +213,7 @@ export function ExplainerPlayer({ lessonId }: { lessonId: number }) {
   }
 
   return (
-    <div className="relative overflow-hidden rounded-t-[20px] bg-[#DCEBFB]">
+    <div className="relative overflow-hidden rounded-t-[20px] bg-[#DCEBFB] dark:bg-[#121820]">
       <style>{CSS}</style>
       <svg viewBox="0 0 320 200" className="block aspect-video w-full" role="img" aria-label={ex.captions[i]}>
         <defs>
@@ -237,7 +237,7 @@ export function ExplainerPlayer({ lessonId }: { lessonId: number }) {
         <div className="flex flex-1 gap-1">
           {ex.scenes.map((_, k) => (
             <div key={k} className="h-1 flex-1 overflow-hidden rounded-full bg-white/45">
-              <div className="h-full bg-white" style={{ width: `${k < i ? 100 : k === i ? Math.min(100, (t / SCENE_MS) * 100) : 0}%` }} />
+              <div className="h-full bg-card" style={{ width: `${k < i ? 100 : k === i ? Math.min(100, (t / SCENE_MS) * 100) : 0}%` }} />
             </div>
           ))}
         </div>

@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type ReactNode } from 'react'
+﻿import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { money } from './format'
 import { Icon, type IconName } from './icons'
 import type { Card as CardT } from './types'
@@ -36,7 +36,7 @@ export function BonusBannerHost() {
   return (
     <div
       key={b.id} role="status" onClick={() => setB(null)}
-      className={`absolute inset-x-3 top-3 z-50 flex items-center gap-3 rounded-2xl bg-white px-4 py-3 shadow-xl ring-1 ring-black/5 ${b.leaving ? 'anim-toast-out' : 'anim-toast'}`}
+      className={`absolute inset-x-3 top-3 z-50 flex items-center gap-3 rounded-2xl bg-card px-4 py-3 shadow-xl ring-1 ring-line ${b.leaving ? 'anim-toast-out' : 'anim-toast'}`}
     >
       <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-mt-blue text-white"><Icon name="gift" size={22} /></span>
       <span className="min-w-0">
@@ -64,7 +64,7 @@ export function ToastHost() {
   return (
     <div
       key={msg.id}
-      className={`pointer-events-none absolute inset-x-4 top-4 z-50 rounded-2xl bg-mt-ink/90 px-4 py-3 text-center text-sm font-medium text-white shadow-lg backdrop-blur ${msg.leaving ? 'anim-toast-out' : 'anim-toast'}`}
+      className={`pointer-events-none absolute inset-x-4 top-4 z-50 rounded-2xl bg-card px-4 py-3 text-center text-sm font-medium text-mt-ink shadow-lg ring-1 ring-line backdrop-blur ${msg.leaving ? 'anim-toast-out' : 'anim-toast'}`}
     >
       {msg.text}
     </div>
@@ -111,7 +111,7 @@ export function Card({ children, className = '', onClick }: { children: ReactNod
   return (
     <div
       onClick={onClick}
-      className={`rounded-[20px] bg-white p-4 ${onClick ? 'cursor-pointer transition active:scale-[0.99] active:bg-[#FAFBFD]' : ''} ${className}`}
+      className={`rounded-[20px] bg-card p-4 shadow-sm ring-1 ring-line ${onClick ? 'cursor-pointer transition active:scale-[0.99] active:bg-elevated' : ''} ${className}`}
     >
       {children}
     </div>
@@ -135,8 +135,8 @@ type Tone = 'primary' | 'accent' | 'secondary' | 'danger' | 'ghost'
 const BTN: Record<Tone, string> = {
   primary: `${GRAD} text-white shadow-[0_8px_18px_-8px_rgba(43,95,219,0.75)]`,
   accent: 'bg-gradient-to-r from-mt-red to-mt-orange text-white shadow-[0_8px_18px_-8px_rgba(228,44,38,0.7)]',
-  secondary: `bg-[#E9F1FE] ${BLUE}`,
-  danger: 'bg-white text-mt-red ring-1 ring-mt-red/25',
+  secondary: `bg-tint ${BLUE}`,
+  danger: 'bg-card text-mt-red ring-1 ring-mt-red/25',
   ghost: `bg-transparent ${BLUE}`,
 }
 
@@ -168,7 +168,7 @@ export function FloatAction({ icon, label, onClick }: { icon: IconName; label: s
     <div className="sticky bottom-3 z-10 px-4 pt-2">
       <button
         onClick={onClick}
-        className="flex h-14 w-full items-center justify-center gap-2.5 rounded-full bg-white text-[17px] font-medium text-mt-ink shadow-[0_8px_28px_rgba(20,20,22,0.14)] transition active:scale-[0.98]"
+        className="flex h-14 w-full items-center justify-center gap-2.5 rounded-full bg-card text-[17px] font-medium text-mt-ink shadow-[0_8px_28px_rgba(20,20,22,0.14)] transition active:scale-[0.98]"
       >
         <Icon name={icon} size={26} className={BLUE} />
         {label}
@@ -180,12 +180,12 @@ export function FloatAction({ icon, label, onClick }: { icon: IconName; label: s
 // ───────── Метки и индикаторы ─────────
 export type BadgeTone = 'blue' | 'solid' | 'red' | 'redsoft' | 'sky' | 'gray'
 const BADGE: Record<BadgeTone, string> = {
-  blue: `bg-[#E9F1FE] ${BLUE}`,
+  blue: `bg-tint ${BLUE}`,
   solid: 'bg-[#2B5FDB] text-white',
   red: 'bg-mt-red text-white',
-  redsoft: 'bg-[#FDECEB] text-mt-red',
-  sky: 'bg-mt-sky/40 text-mt-ink',
-  gray: 'bg-[#EEF0F4] text-muted',
+  redsoft: 'bg-tint-red text-mt-red',
+  sky: 'bg-tint text-mt-ink',
+  gray: 'bg-elevated text-muted',
 }
 export function Badge({ children, tone = 'blue' }: { children: ReactNode; tone?: BadgeTone }) {
   return <span className={`inline-flex items-center gap-1 whitespace-nowrap rounded-lg px-2 py-0.5 text-xs font-semibold ${BADGE[tone]}`}>{children}</span>
@@ -195,7 +195,7 @@ export function Badge({ children, tone = 'blue' }: { children: ReactNode; tone?:
 export function Progress({ value, max, tone = 'blue' }: { value: number; max: number; tone?: 'blue' | 'brand' }) {
   const pct = useGrow(max > 0 ? Math.min(100, Math.max(0, Math.round((value / max) * 100))) : 0)
   return (
-    <div className="h-2 w-full overflow-hidden rounded-full bg-[#EEF0F4]">
+    <div className="h-2 w-full overflow-hidden rounded-full bg-elevated">
       <div
         className={`h-full rounded-full transition-[width] duration-700 ease-[cubic-bezier(.22,1,.36,1)] ${tone === 'brand' ? 'bg-gradient-to-r from-mt-red to-mt-orange' : 'bg-gradient-to-r from-[#6AA6F3] to-[#2B5FDB]'}`}
         style={{ width: `${pct}%` }}
@@ -206,10 +206,10 @@ export function Progress({ value, max, tone = 'blue' }: { value: number; max: nu
 
 type TileTone = 'blue' | 'red' | 'solid' | 'gray'
 const TILE: Record<TileTone, string> = {
-  blue: `bg-[#E9F1FE] ${BLUE}`,
-  red: 'bg-[#FDECEB] text-mt-red',
+  blue: `bg-tint ${BLUE}`,
+  red: 'bg-tint-red text-mt-red',
   solid: `${GRAD} text-white`,
-  gray: 'bg-[#EEF0F4] text-muted',
+  gray: 'bg-elevated text-muted',
 }
 export function IconTile({ name, tone = 'blue', size = 40 }: { name: IconName; tone?: TileTone; size?: number }) {
   return (
@@ -233,7 +233,7 @@ export function Avatar({ name, size = 40, light }: { name: string; size?: number
 
 export function Note({ children, tone = 'blue', icon = 'shield' }: { children: ReactNode; tone?: 'blue' | 'red'; icon?: IconName }) {
   return (
-    <div className={`flex items-center gap-2.5 rounded-[20px] px-4 py-3.5 text-sm ${tone === 'red' ? 'bg-[#FDECEB] text-mt-red' : `bg-white ${BLUE}`}`}>
+    <div className={`flex items-center gap-2.5 rounded-[20px] px-4 py-3.5 text-sm ${tone === 'red' ? 'bg-tint-red text-mt-red' : `bg-tint ${BLUE}`}`}>
       <Icon name={icon} size={20} />
       <div className="font-medium">{children}</div>
     </div>
@@ -248,7 +248,7 @@ export function Toggle({ on, onChange, disabled }: { on: boolean; onChange: (v: 
       onClick={() => onChange(!on)}
       role="switch"
       aria-checked={on}
-      className={`relative h-[30px] w-[50px] shrink-0 rounded-full transition disabled:opacity-40 ${on ? 'bg-[#2F6FE4]' : 'bg-[#D3D8E0]'}`}
+      className={`relative h-[30px] w-[50px] shrink-0 rounded-full transition disabled:opacity-40 ${on ? 'bg-[#2F6FE4]' : 'bg-elevated'}`}
     >
       <span className={`absolute top-[2px] h-[26px] w-[26px] rounded-full bg-white shadow transition-all ${on ? 'left-[22px]' : 'left-[2px]'}`} />
     </button>
@@ -266,7 +266,7 @@ export function Field({ label, value, onChange, placeholder, type = 'text', inpu
         <input
           type={type} inputMode={inputMode} value={value} placeholder={placeholder}
           onChange={(e) => onChange(e.target.value)}
-          className="h-12 w-full rounded-2xl border border-[#DDE2EA] bg-white px-4 text-[15px] text-mt-ink outline-none transition placeholder:text-[#A3ABB8] focus:border-[#2F6FE4] focus:ring-2 focus:ring-[#2F6FE4]/15"
+          className="h-12 w-full rounded-2xl border border-line bg-card px-4 text-[15px] text-mt-ink outline-none transition placeholder:text-[#A3ABB8] focus:border-[#2F6FE4] focus:ring-2 focus:ring-[#2F6FE4]/15"
         />
         {suffix && <span className="pointer-events-none absolute right-4 top-1/2 -translate-y-1/2 text-[15px] text-muted">{suffix}</span>}
       </div>
@@ -280,7 +280,7 @@ export function Segmented<T extends string | number>({ options, value, onChange 
   // Синяя «таблетка» плавно переезжает под выбранный вариант
   const idx = Math.max(0, options.findIndex((o) => o.id === value))
   return (
-    <div className="relative flex rounded-2xl bg-white p-1">
+    <div className="relative flex rounded-2xl bg-card p-1">
       <div
         className={`absolute bottom-1 left-1 top-1 rounded-xl ${GRAD} shadow-[0_6px_14px_-8px_rgba(43,95,219,0.8)] transition-transform duration-300 ease-[cubic-bezier(.22,1,.36,1)]`}
         style={{ width: `calc((100% - 8px) / ${options.length})`, transform: `translateX(${idx * 100}%)` }}
@@ -320,10 +320,10 @@ export function Sheet({ open, onClose, title, children }: { open: boolean; onClo
       onClick={onClose}
     >
       <div
-        className={`max-h-[88%] w-full overflow-y-auto rounded-t-[28px] bg-white px-5 pb-8 pt-3 ${leaving ? 'anim-sheet-out' : 'anim-sheet'}`}
+        className={`max-h-[88%] w-full overflow-y-auto rounded-t-[28px] bg-card px-5 pb-8 pt-3 ${leaving ? 'anim-sheet-out' : 'anim-sheet'}`}
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="mx-auto mb-4 h-1 w-10 rounded-full bg-[#D5DAE2]" />
+        <div className="mx-auto mb-4 h-1 w-10 rounded-full bg-elevated" />
         {c.title && <h3 className="mb-4 text-xl font-bold tracking-tight text-mt-ink">{c.title}</h3>}
         {c.children}
       </div>
@@ -339,7 +339,8 @@ export function Header({ title, subtitle, onBack, right, tall }: {
 })
 {
   return (
-    <div className={`rounded-b-[32px] bg-gradient-to-b from-[#2B5FDB] to-[#6AA6F3] px-4 pt-[max(env(safe-area-inset-top),20px)] sm:pt-[52px] text-white ${tall ? 'pb-16' : 'pb-6'}`}>      <div className="flex items-center gap-3">
+    <div className={`rounded-b-[32px] bg-gradient-to-b from-[#2B5FDB] to-[#6AA6F3] px-4 pt-[max(env(safe-area-inset-top),24px)] sm:pt-[74px] text-white ${tall ? 'pb-16' : 'pb-6'}`}>
+      <div className="flex items-center gap-3">
         {onBack && (
           <button onClick={onBack} aria-label="Назад" className="-ml-1 flex h-11 w-11 items-center justify-center rounded-2xl bg-white/20 transition hover:bg-white/30">
             <Icon name="chevron-left" size={22} />
@@ -384,7 +385,7 @@ export function BalanceCard({ card, title, limit }: {
 }) {
   const blocked = card.status === 'blocked'
   return (
-    <div className="rounded-[24px] bg-white p-5 shadow-[0_10px_30px_-18px_rgba(20,20,22,0.35)]">
+    <div className="rounded-[24px] bg-card p-5 shadow-sm ring-1 ring-line">
       <div className="flex items-center gap-4">
         <MiniCard last4={card.last4} blocked={blocked} />
         <div className="min-w-0 flex-1">
@@ -396,7 +397,7 @@ export function BalanceCard({ card, title, limit }: {
         <div className="mt-4"><Badge tone="red"><Icon name="lock" size={14} />Карта заблокирована</Badge></div>
       )}
       {!blocked && limit && limit.limit_cents != null && (
-        <div className="mt-4 space-y-2 border-t border-[#EEF0F4] pt-4">
+        <div className="mt-4 space-y-2 border-t border-line pt-4">
           <div className="flex items-baseline justify-between text-sm">
             <span className="text-muted">Можно потратить сегодня</span>
             <span className="font-semibold tabular-nums text-mt-ink">{money(limit.left_cents ?? 0)}</span>
@@ -406,7 +407,7 @@ export function BalanceCard({ card, title, limit }: {
         </div>
       )}
       {!blocked && limit && limit.limit_cents == null && (
-        <div className="mt-4 border-t border-[#EEF0F4] pt-3 text-sm text-muted">Дневной лимит не установлен</div>
+        <div className="mt-4 border-t border-line pt-3 text-sm text-muted">Дневной лимит не установлен</div>
       )}
     </div>
   )
@@ -417,13 +418,13 @@ export function BalanceCard({ card, title, limit }: {
 export interface TabDef { id: string; label: string; icon: IconName; badge?: number }
 export function BottomNav({ tabs, active, onChange }: { tabs: TabDef[]; active: string; onChange: (id: string) => void }) {
   return (
-    <nav className="flex gap-1 rounded-t-[32px] bg-white px-2 pb-[max(10px,env(safe-area-inset-bottom))] pt-2.5 shadow-[0_-6px_24px_rgba(20,20,22,0.07)]">
+    <nav className="flex gap-1 rounded-t-[32px] bg-card px-2 pb-[max(10px,env(safe-area-inset-bottom))] pt-2.5 shadow-[0_-6px_24px_rgba(20,20,22,0.07)] ring-1 ring-line">
       {tabs.map((t) => {
         const on = active === t.id
         return (
           <button
             key={t.id} onClick={() => onChange(t.id)}
-            className={`relative flex flex-1 flex-col items-center gap-0.5 rounded-[22px] py-2 text-[11px] font-semibold transition ${on ? `bg-[#EEF0F4] ${BLUE}` : 'text-mt-ink'}`}
+            className={`relative flex flex-1 flex-col items-center gap-0.5 rounded-[22px] py-2 text-[11px] font-semibold transition ${on ? `bg-elevated ${BLUE}` : 'text-mt-ink'}`}
           >
             <span key={on ? 'on' : 'off'} className={on ? 'anim-tab' : ''}><Icon name={t.icon} size={24} strokeWidth={on ? 2 : 1.7} /></span>
             {t.label}
@@ -442,7 +443,7 @@ export function BottomNav({ tabs, active, onChange }: { tabs: TabDef[]; active: 
 // ───────── Состояния ─────────
 export function Empty({ text, icon = 'check' }: { text: string; icon?: IconName }) {
   return (
-    <div className="flex flex-col items-center gap-3 rounded-[20px] bg-white py-8 text-center">
+    <div className="flex flex-col items-center gap-3 rounded-[20px] bg-card py-8 text-center">
       <IconTile name={icon} size={52} />
       <div className={`px-6 text-[15px] font-medium ${BLUE}`}>{text}</div>
     </div>
@@ -452,9 +453,9 @@ export function Empty({ text, icon = 'check' }: { text: string; icon?: IconName 
 export function Loading() {
   return (
     <div className="space-y-3 p-4">
-      <div className="h-32 animate-pulse rounded-[24px] bg-white" />
-      <div className="h-16 animate-pulse rounded-[20px] bg-white/80" />
-      <div className="h-16 animate-pulse rounded-[20px] bg-white/60" />
+      <div className="h-32 animate-pulse rounded-[24px] bg-card" />
+      <div className="h-16 animate-pulse rounded-[20px] bg-card/80" />
+      <div className="h-16 animate-pulse rounded-[20px] bg-card/60" />
     </div>
   )
 }
@@ -466,7 +467,7 @@ export function Row({ icon, iconTone, title, sub, right, onClick, chevron, plain
   onClick?: () => void; chevron?: boolean; plain?: boolean
 }) {
   return (
-    <div onClick={onClick} className={`flex items-center gap-3.5 px-4 py-3 ${onClick ? 'cursor-pointer transition active:bg-[#F6F7F9]' : ''}`}>
+    <div onClick={onClick} className={`flex items-center gap-3.5 px-4 py-3 ${onClick ? 'cursor-pointer transition active:bg-elevated' : ''}`}>
       {icon && (plain ? <Icon name={icon} size={30} strokeWidth={1.6} className={BLUE} /> : <IconTile name={icon} tone={iconTone} />)}
       <div className="min-w-0 flex-1">
         <div className={`truncate text-mt-ink ${plain ? 'text-[17px] font-semibold' : 'text-[15px] font-medium'}`}>{title}</div>

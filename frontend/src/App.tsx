@@ -8,6 +8,8 @@ import { ChildGoals, ChildHome, ChildLevel, ChildPay, ChildTasks, LessonScreen, 
 import { LoyaltyScreen } from './screens/shared'
 import { ChildManage, PackageFlow, ParentHome, ParentProducts, ParentRequests, ParentTasks } from './screens/parent'
 import { LoginScreen } from './screens/auth'
+import { useTheme } from './theme'
+import { Icon } from './icons'
 
 function ParentShell() {
   const { tab, setTab, stack, back } = useNav()
@@ -93,6 +95,42 @@ function formatStatusTime() {
   return `${d.getHours()}:${String(d.getMinutes()).padStart(2, '0')}`
 }
 
+/** Строка как в симуляторе: время слева, остров по центру, сеть и батарея справа */
+function StatusBar({ time }: { time: string }) {
+  return (
+    <div className="pointer-events-none absolute inset-x-0 top-0 z-30 hidden sm:block">
+      <div className="status-frost absolute inset-x-0 top-0 h-[72px]" />
+      <div className="relative flex h-[54px] items-center justify-between px-7 text-[15px] font-semibold tracking-[-0.03em] text-mt-ink">
+      <span className="w-[54px] tabular-nums leading-none">{time}</span>
+
+      <div className="absolute left-1/2 top-1/2 h-[36px] w-[120px] -translate-x-1/2 -translate-y-1/2 rounded-full bg-black">
+        <div className="absolute left-[24px] top-1/2 h-[9px] w-[9px] -translate-y-1/2 rounded-full bg-[#1a1a1a] ring-1 ring-[#2a2a2a]" />
+        <div className="absolute right-[16px] top-1/2 h-[12px] w-[12px] -translate-y-1/2 rounded-full bg-[#0c0c0e] ring-1 ring-[#222]">
+          <div className="absolute left-1/2 top-1/2 h-[4px] w-[4px] -translate-x-1/2 -translate-y-1/2 rounded-full bg-[#1a2230]" />
+        </div>
+      </div>
+
+      <div className="flex items-center justify-end gap-[6px]">
+        <svg width="19" height="12" viewBox="0 0 19 12" fill="currentColor" aria-hidden>
+          <rect x="0" y="8" width="3.2" height="4" rx="0.7" />
+          <rect x="4.8" y="5.5" width="3.2" height="6.5" rx="0.7" />
+          <rect x="9.6" y="3" width="3.2" height="9" rx="0.7" />
+          <rect x="14.4" y="0.5" width="3.2" height="11.5" rx="0.7" />
+        </svg>
+        <svg width="17" height="12" viewBox="0 0 17 12" fill="currentColor" aria-hidden>
+          <path d="M8.5 2c2.3 0 4.3 1 5.7 2.55l-1.4 1.35A5.6 5.6 0 0 0 8.5 4.3c-1.7 0-3.15.7-4.2 1.8L2.85 4.75A7.4 7.4 0 0 1 8.5 2Zm0 3.5c1.3 0 2.4.5 3.25 1.45L10.4 8.3A2.8 2.8 0 0 0 8.5 7.6c-.8 0-1.55.3-2.1.85L5.1 7.1A4.5 4.5 0 0 1 8.5 5.5Zm0 3.55c.7 0 1.25.55 1.25 1.25S9.2 11.55 8.5 11.55 7.25 11 7.25 10.3 7.8 9.05 8.5 9.05Z" />
+        </svg>
+        <svg width="27" height="13" viewBox="0 0 27 13" aria-hidden>
+          <rect x="0.55" y="0.55" width="22" height="11.9" rx="3.4" stroke="currentColor" strokeOpacity="0.55" fill="none" strokeWidth="1.1" />
+          <rect x="2" y="2" width="17.5" height="9" rx="2.1" fill="currentColor" />
+          <path d="M24.3 4.1v4.8a2 2 0 0 0 0-4.8Z" fill="currentColor" opacity="0.5" />
+        </svg>
+      </div>
+      </div>
+    </div>
+  )
+}
+
 /** Рамка как в Xcode: равный безель, статичный Dynamic Island, живое время */
 function IPhoneFrame({ children }: { children: ReactNode }) {
   const [time, setTime] = useState(formatStatusTime)
@@ -114,7 +152,7 @@ function IPhoneFrame({ children }: { children: ReactNode }) {
   // Безель 8px со всех сторон: outer radius 52 → inner 44
   return (
     <div
-      className="relative flex h-[calc(100dvh-44px)] w-full flex-col overflow-hidden bg-[#F2F2F7]
+      className="relative flex h-[calc(100dvh-44px)] w-full flex-col overflow-hidden bg-surface
         sm:h-[min(852px,calc(100dvh-88px))] sm:w-[393px] sm:max-w-[393px]
         sm:rounded-[52px] sm:border-[8px] sm:border-[#111111]
         sm:bg-[#111111] sm:shadow-[0_20px_60px_-16px_rgba(0,0,0,0.45)]"
@@ -125,42 +163,14 @@ function IPhoneFrame({ children }: { children: ReactNode }) {
       <div className="pointer-events-none absolute -left-[11px] top-[224px] hidden h-[54px] w-[3px] rounded-l-[1px] bg-[#2a2a2a] sm:block" />
       <div className="pointer-events-none absolute -right-[11px] top-[190px] hidden h-[70px] w-[3px] rounded-r-[1px] bg-[#2a2a2a] sm:block" />
 
-      <div className="relative flex min-h-0 flex-1 flex-col overflow-hidden bg-[#F2F2F7] sm:rounded-[44px]">
-        {/* Статус-бар + статичный Dynamic Island */}
-        {/* Статус-бар + статичный Dynamic Island (только для ПК) */}
-        <div className="pointer-events-none absolute inset-x-0 top-0 z-30 hidden h-[54px] items-end justify-between px-[28px] pb-[11px] text-[15px] font-semibold tracking-[-0.03em] text-white sm:flex">          <span className="min-w-[54px] pl-0.5 tabular-nums leading-none">{time}</span>
-
-          <div className="absolute left-1/2 top-[12px] h-[37px] w-[126px] -translate-x-1/2 rounded-full bg-black">
-            <div className="absolute left-[22%] top-1/2 h-[9px] w-[9px] -translate-y-1/2 rounded-full bg-[#1a1a1a] ring-1 ring-[#2a2a2a]" />
-            <div className="absolute right-[18px] top-1/2 h-[11px] w-[11px] -translate-y-1/2 rounded-full bg-[#0c0c0e] ring-1 ring-[#222]">
-              <div className="absolute left-1/2 top-1/2 h-[4px] w-[4px] -translate-x-1/2 -translate-y-1/2 rounded-full bg-[#1a2230]" />
-            </div>
-          </div>
-
-          <div className="flex items-center justify-end gap-[6px]">
-            <svg width="19" height="12" viewBox="0 0 19 12" fill="currentColor" aria-hidden>
-              <rect x="0" y="8" width="3.2" height="4" rx="0.7" />
-              <rect x="4.8" y="5.5" width="3.2" height="6.5" rx="0.7" />
-              <rect x="9.6" y="3" width="3.2" height="9" rx="0.7" />
-              <rect x="14.4" y="0.5" width="3.2" height="11.5" rx="0.7" />
-            </svg>
-            <svg width="17" height="12" viewBox="0 0 17 12" fill="currentColor" aria-hidden>
-              <path d="M8.5 2c2.3 0 4.3 1 5.7 2.55l-1.4 1.35A5.6 5.6 0 0 0 8.5 4.3c-1.7 0-3.15.7-4.2 1.8L2.85 4.75A7.4 7.4 0 0 1 8.5 2Zm0 3.5c1.3 0 2.4.5 3.25 1.45L10.4 8.3A2.8 2.8 0 0 0 8.5 7.6c-.8 0-1.55.3-2.1.85L5.1 7.1A4.5 4.5 0 0 1 8.5 5.5Zm0 3.55c.7 0 1.25.55 1.25 1.25S9.2 11.55 8.5 11.55 7.25 11 7.25 10.3 7.8 9.05 8.5 9.05Z" />
-            </svg>
-            <svg width="27" height="13" viewBox="0 0 27 13" aria-hidden>
-              <rect x="0.55" y="0.55" width="22" height="11.9" rx="3.4" stroke="currentColor" strokeOpacity="0.55" fill="none" strokeWidth="1.1" />
-              <rect x="2" y="2" width="17.5" height="9" rx="2.1" fill="currentColor" />
-              <path d="M24.3 4.1v4.8a2 2 0 0 0 0-4.8Z" fill="currentColor" opacity="0.5" />
-            </svg>
-          </div>
-        </div>
-
+      <div className="relative flex min-h-0 flex-1 flex-col overflow-hidden bg-surface sm:rounded-[44px]">
+        <StatusBar time={time} />
         <div className="relative flex min-h-0 flex-1 flex-col overflow-hidden">
           {children}
         </div>
 
         <div className="pointer-events-none absolute inset-x-0 bottom-[8px] z-30 flex justify-center">
-          <div className="h-[5px] w-[134px] rounded-full bg-black/90" />
+          <div className="h-[5px] w-[134px] rounded-full bg-mt-ink/80" />
         </div>
       </div>
     </div>
@@ -169,12 +179,13 @@ function IPhoneFrame({ children }: { children: ReactNode }) {
 
 export default function App() {
   const [user, setUser] = useState<LoginResult | null>(null)
+  const { theme, toggle } = useTheme()
   // session.userId выставляется до рендера экранов, чтобы первый запрос ушёл от нужного пользователя
   if (user) session.userId = user.id
 
   return (
     <div className="flex min-h-[100dvh] flex-col items-center sm:gap-4 sm:py-5">
-      <div className="flex w-full items-center justify-center gap-2 bg-white px-3 py-2 sm:w-auto sm:rounded-full sm:py-1.5 sm:pl-4 sm:shadow-sm">
+      <div className="flex w-full items-center justify-center gap-2 bg-card px-3 py-2 ring-1 ring-line sm:w-auto sm:rounded-full sm:py-1.5 sm:pl-4 sm:shadow-sm">
         <span className="text-xs font-semibold text-muted">Демо{usingMock ? ' · mock' : ''}</span>
         {user ? (
           <>
@@ -182,7 +193,7 @@ export default function App() {
             <button
               type="button"
               onClick={() => { session.userId = 0; setUser(null) }}
-              className="rounded-full bg-[#EEF1F5] px-3 py-1 text-[13px] font-semibold text-muted transition hover:text-mt-ink"
+              className="rounded-full bg-elevated px-3 py-1 text-[13px] font-semibold text-muted transition hover:text-mt-ink"
             >
               Выйти
             </button>
@@ -190,6 +201,15 @@ export default function App() {
         ) : (
           <span className="text-[13px] font-medium text-muted">Вход в Moby</span>
         )}
+        <button
+          type="button"
+          onClick={toggle}
+          aria-label={theme === 'dark' ? 'Светлая тема' : 'Тёмная тема'}
+          title={theme === 'dark' ? 'Светлая тема' : 'Тёмная тема'}
+          className="flex h-8 w-8 items-center justify-center rounded-full bg-elevated text-mt-ink transition hover:opacity-80"
+        >
+          <Icon name={theme === 'dark' ? 'sun' : 'moon'} size={18} />
+        </button>
       </div>
       <IPhoneFrame>
         <ToastHost />

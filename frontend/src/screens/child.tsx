@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+﻿import { useEffect, useRef, useState } from 'react'
 import { api, session } from '../api'
 import { CATEGORY_ICON, CATEGORY_LABEL, PERMISSION_INFO, dateShort, money, toCents } from '../format'
 import { useData } from '../hooks'
@@ -36,7 +36,7 @@ export function ChildHome({ meId }: { meId: number }) {
 
         <div className="grid grid-cols-4 gap-2">
           {actions.map((a) => (
-            <button key={a.label} onClick={a.go} className="flex flex-col items-center gap-1.5 rounded-[20px] bg-white py-3 transition active:scale-[0.97]">
+            <button key={a.label} onClick={a.go} className="flex flex-col items-center gap-1.5 rounded-[20px] bg-card py-3 transition active:scale-[0.97]">
               <IconTile name={a.icon} />
               <span className="text-xs font-semibold text-mt-ink">{a.label}</span>
             </button>
@@ -141,14 +141,14 @@ export function ChildPay({ meId }: { meId: number }) {
       <Sheet open={!!res} onClose={() => setRes(null)}>
         {res && (
           <div className="flex flex-col items-center text-center">
-            <div className={`anim-pop flex h-16 w-16 items-center justify-center rounded-full ${result === 'approved' ? 'bg-[#2F6FE4] text-white' : result === 'pending' ? 'bg-mt-sky/50 text-mt-ink' : 'bg-mt-red text-white'}`}>
+            <div className={`anim-pop flex h-16 w-16 items-center justify-center rounded-full ${result === 'approved' ? 'bg-[#2F6FE4] text-white' : result === 'pending' ? 'bg-tint text-mt-ink' : 'bg-mt-red text-white'}`}>
               <Icon name={result === 'approved' ? 'check' : result === 'pending' ? 'clock' : 'x'} size={32} strokeWidth={2.4} />
             </div>
             <div className="mt-4 text-[22px] font-bold tracking-tight text-mt-ink">
               {result === 'approved' ? 'Оплачено' : result === 'pending' ? 'Ждём родителя' : 'Покупка отклонена'}
             </div>
             <div className="mt-1 text-[15px] text-muted">{res.m.name} · <span className="tabular-nums">{money(res.m.cents)}</span></div>
-            <div className="mt-4 w-full rounded-xl bg-[#F3F6FA] px-4 py-3 text-sm text-mt-ink">{res.r.message}</div>
+            <div className="mt-4 w-full rounded-xl bg-elevated px-4 py-3 text-sm text-mt-ink">{res.r.message}</div>
             <div className="mt-5 w-full space-y-2">
               {ask && <Btn icon="chat"onClick={() => { const a = ask; setRes(null); push({ name: 'request', params: a }) }}>Попросить у родителя</Btn>}
               <Btn tone="secondary" onClick={() => setRes(null)}>Готово</Btn>
@@ -233,7 +233,7 @@ export function RequestScreen({ type: t0, amount: a0, category: c0, permission: 
               {cats.map((k) => {
                 const on = category === k
                 return (
-                  <button key={k} onClick={() => setCategory(k)} className={`flex flex-col items-center gap-1.5 rounded-xl border px-1 py-3 transition ${on ? 'border-[#2F6FE4] bg-[#E9F1FE]' : 'border-transparent bg-white'}`}>
+                  <button key={k} onClick={() => setCategory(k)} className={`flex flex-col items-center gap-1.5 rounded-xl border px-1 py-3 transition ${on ? 'border-[#2F6FE4] bg-tint' : 'border-transparent bg-card'}`}>
                     <Icon name={CATEGORY_ICON[k]} size={22} className={on ? 'text-[#2F6FE4]' : 'text-muted'} />
                     <span className={`text-xs font-semibold ${on ? 'text-[#2F6FE4]' : 'text-mt-ink'}`}>{CATEGORY_LABEL[k]}</span>
                   </button>
@@ -410,7 +410,7 @@ export function ChildLevel({ meId }: { meId: number }) {
           <div className="min-w-0 flex-1">
             <div className="text-[13px] tabular-nums text-muted">{lv.xp} XP</div>
             <div className="text-[15px] font-semibold text-mt-ink">{lv.xp_to_next > 0 ? `Ещё ${lv.xp_to_next} XP до уровня ${lv.level + 1}` : 'Максимальный уровень'}</div>
-            <button onClick={() => push({ name: 'loyalty' })} className="mt-3 flex w-full items-center gap-2 rounded-2xl bg-[#F3F5F8] px-3 py-2.5 text-left">
+            <button onClick={() => push({ name: 'loyalty' })} className="mt-3 flex w-full items-center gap-2 rounded-2xl bg-elevated px-3 py-2.5 text-left">
               <Icon name="coins" size={20} className="text-[#2F6FE4]" />
               <span className="flex-1 text-sm font-semibold tabular-nums text-mt-ink">{(loyalty.data?.points ?? 0).toLocaleString('ru-RU')} баллов</span>
               <Icon name="chevron-right" size={18} className="text-[#A3ABB8]" />
@@ -475,7 +475,7 @@ export function LessonScreen({ id }: { id: number }) {
             <p className="text-[15px] font-semibold text-mt-ink">{lesson.question}</p>
             {lesson.options.map((o, i) => {
               const chosen = picked === i
-              const tone = result && chosen ? (result.correct ? 'border-[#2F6FE4] bg-[#E9F1FE]' : 'border-mt-red bg-[#FDECEB]') : chosen ? 'border-[#2F6FE4]' : 'border-[#DDE2EA]'
+              const tone = result && chosen ? (result.correct ? 'border-[#2F6FE4] bg-tint' : 'border-mt-red bg-tint-red') : chosen ? 'border-[#2F6FE4]' : 'border-line'
               return (
                 <button
                   key={i} disabled={!!result?.correct}

@@ -2,11 +2,42 @@
 @tailwind components;
 @tailwind utilities;
 
+/* ───────── Тема: светлая / тёмная ─────────
+   RGB-каналы, чтобы работали bg-card/80 и подобные. */
+:root {
+  --surface: 242 242 247;
+  --card: 255 255 255;
+  --elevated: 238 241 245;
+  --ink: 20 20 22;
+  --muted: 94 104 120;
+  --line: 226 230 237;
+  --tint: 233 241 254;
+  --tint-red: 253 236 235;
+  --body-from: #E7F4FF;
+  --body-to: #C9E2F8;
+  --ease-out: cubic-bezier(.22, 1, .36, 1);
+  --ease-sheet: cubic-bezier(.32, .72, 0, 1);
+}
+
+html.dark {
+  --surface: 6 7 9;
+  --card: 14 15 18;
+  --elevated: 24 26 32;
+  --ink: 226 228 232;
+  --muted: 122 130 142;
+  --line: 36 39 48;
+  --tint: 18 28 48;
+  --tint-red: 42 18 18;
+  --body-from: #030407;
+  --body-to: #06070B;
+  color-scheme: dark;
+}
+
 html, body, #root { height: 100%; }
 body {
   margin: 0;
-  background: linear-gradient(180deg, #E7F4FF 0%, #C9E2F8 100%) fixed; /* фон вокруг «телефона» */
-  color: #141416;
+  background: linear-gradient(180deg, var(--body-from) 0%, var(--body-to) 100%) fixed;
+  color: rgb(var(--ink));
   -webkit-font-smoothing: antialiased;
   -webkit-tap-highlight-color: transparent;
 }
@@ -16,13 +47,24 @@ input, select, button { font: inherit; }
 * { scrollbar-width: none; }
 *::-webkit-scrollbar { display: none; }
 
+/* Статус-бар: блюр только у острова, ниже плавно сходит — заголовки уже резкие */
+.status-frost {
+  pointer-events: none;
+  backdrop-filter: blur(18px) saturate(1.35);
+  -webkit-backdrop-filter: blur(18px) saturate(1.35);
+  background: linear-gradient(
+    to bottom,
+    rgb(var(--surface) / 0.62) 0%,
+    rgb(var(--surface) / 0.22) 55%,
+    rgb(var(--surface) / 0) 100%
+  );
+  -webkit-mask-image: linear-gradient(to bottom, #000 0%, #000 48%, transparent 100%);
+  mask-image: linear-gradient(to bottom, #000 0%, #000 48%, transparent 100%);
+}
+
 /* ───────── Анимации ─────────
    Все движения короткие (200–500 мс) и с мягким замедлением в конце.
    Пользователям с «уменьшить движение» в настройках системы анимации отключаются. */
-:root {
-  --ease-out: cubic-bezier(.22, 1, .36, 1);
-  --ease-sheet: cubic-bezier(.32, .72, 0, 1);
-}
 
 @keyframes fade-in   { from { opacity: 0 } to { opacity: 1 } }
 @keyframes fade-out  { from { opacity: 1 } to { opacity: 0 } }

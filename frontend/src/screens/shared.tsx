@@ -1,4 +1,4 @@
-import { useState, type ReactNode } from 'react'
+﻿import { useState, type ReactNode } from 'react'
 import { api } from '../api'
 import { CATEGORY_ICON, CATEGORY_LABEL, DECLINE_TEXT, PERMISSION_INFO, dateTime, money } from '../format'
 import { useData } from '../hooks'
@@ -140,7 +140,7 @@ export function LoyaltyScreen({ onBack }: { onBack?: () => void }) {
     <>
       <Header title="Бонусы и партнёры" subtitle="1 балл = 1 копейка" onBack={onBack} tall />
       <div className="-mt-12 space-y-5 px-4 pb-6">
-        <div className="flex items-center gap-4 rounded-[24px] bg-white p-5 shadow-[0_10px_30px_-18px_rgba(20,20,22,0.35)]">
+        <div className="flex items-center gap-4 rounded-[24px] bg-card p-5 shadow-[0_10px_30px_-18px_rgba(20,20,22,0.35)]">
           <IconTile name="coins" tone="solid" size={52} />
           <div>
             <div className="text-xs font-semibold uppercase tracking-wide text-[#A3ABB8]">Мои баллы</div>
@@ -151,7 +151,7 @@ export function LoyaltyScreen({ onBack }: { onBack?: () => void }) {
         <Section title="Кешбэк баллами">
           <div className="grid grid-cols-2 gap-2">
             {data.cashback.map((c) => (
-              <div key={c.category} className="flex items-center gap-3 rounded-[20px] bg-white p-3.5">
+              <div key={c.category} className="flex items-center gap-3 rounded-[20px] bg-card p-3.5">
                 <Icon name={CATEGORY_ICON[c.category]} size={26} strokeWidth={1.6} className="text-[#2F6FE4]" />
                 <div>
                   <div className="text-sm font-semibold text-mt-ink">{CATEGORY_LABEL[c.category]}</div>
@@ -194,7 +194,7 @@ export function LoyaltyScreen({ onBack }: { onBack?: () => void }) {
         {code && (
           <div className="space-y-4 text-center">
             <div className="text-[15px] text-muted">{code.title}</div>
-            <div className="rounded-2xl bg-[#F3F5F8] py-5 text-3xl font-bold tracking-[0.15em] text-mt-ink">{code.code}</div>
+            <div className="rounded-2xl bg-elevated py-5 text-3xl font-bold tracking-[0.15em] text-mt-ink">{code.code}</div>
             <div className="text-sm text-muted">Покажите код у партнёра</div>
             <Btn onClick={() => setCode(null)}>Готово</Btn>
           </div>
