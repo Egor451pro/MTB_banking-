@@ -264,6 +264,18 @@ export function mockApi(): Api {
   }
 
   const api: Api = {
+    async login(login) {
+      const key = login.trim().toLowerCase()
+      if (!key) throw new MockError('validation_error', 'Укажите логин')
+      const u = db.users.find((x) => {
+        const name = x.name.trim().toLowerCase()
+        const first = name.split(/\s+/)[0] ?? ''
+        return name === key || first === key
+      })
+      if (!u) throw new MockError('not_found', 'Пользователь не найден')
+      return delay({ id: u.id, role: u.role, name: u.name })
+    },
+
     async getMe() {
       const m = me()
       return delay({ id: m.id, role: m.role, name: m.name, family_id: m.family_id, birth_date: m.birth_date, age_group: ageGroup(m) })

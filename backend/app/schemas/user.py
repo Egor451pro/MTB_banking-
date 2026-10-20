@@ -74,3 +74,13 @@ class CardReissueResponse(BaseModel):
     id: int
     last4: str
     status: Literal["active", "blocked"]
+
+
+class LoginRequest(BaseModel):
+    login: str = Field(..., min_length=1, max_length=255)
+
+
+class LoginResponse(BaseModel):
+    id: int
+    role: Literal["parent", "child"]
+    name: str
