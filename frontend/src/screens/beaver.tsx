@@ -16,7 +16,9 @@ const LOGS_PER_TASK = 3
 const LOGS_PER_GOAL_DONE = 20
 const LOGS_PER_LESSON = 2
 
-const THROW_GAP_MS = 680   // пауза между бросками
+const PRE_WORK_MS = 1100   // бобёр надевает каску, прежде чем начать
+const THROW_GAP_MS = 800   // пауза между бросками
+const SPEECH_AT_WORK = ['Таскаю брёвна!', 'Строю плотину…', 'Ещё одно бревно!', 'Почти готово…', 'Держись, плотина!']
 const FLIGHT_MS = 560      // сколько летит бревно
 
 // need — сколько брёвен нужно уже построить, чтобы достичь уровня
@@ -60,6 +62,8 @@ export function BeaverScreen({ meId, ageGroup }: { meId: number; ageGroup: strin
   const teen = ageGroup === '14-17'
   const sprite = teen ? '/beaver/teen.png' : '/beaver/kid.png'
   const spriteUp = teen ? '/beaver/teen.png' : '/beaver/kid-wave.png'
+  // «Рабочая форма» строителя (каска). Пока картинки нет, onError возвращает обычный спрайт
+  const spriteBuilder = teen ? '/beaver/teen-builder.png' : '/beaver/kid-builder.png'
 
   const goals = useData(() => api.getGoals(meId), [meId], 3000)
   const tasks = useData(() => api.listTasks(), [], 3000)
@@ -71,6 +75,7 @@ export function BeaverScreen({ meId, ageGroup }: { meId: number; ageGroup: strin
   const [flying, setFlying] = useState<number[]>([])
   const [pops, setPops] = useState<number[]>([])
   const [confetti, setConfetti] = useState(false)
+  const [speech, setSpeech] = useState<string | null>(null)
 
   const damRef = useRef<HTMLDivElement>(null)
   const beaverRef = useRef<HTMLDivElement>(null)
@@ -109,8 +114,10 @@ export function BeaverScreen({ meId, ageGroup }: { meId: number; ageGroup: strin
     setBusy(true)
     const startLevel = levelFor(built).n
     let cur = built
+    setSpeech('Надеваю каску!')
     for (let i = 0; i < spend; i++) {
       later(() => {
+        setSpeech(SPEECH_AT_WORK[i % SPEECH_AT_WORK.length])
         const id = ++uid.current
         setFlying((f) => [...f, id])
         beaverRef.current?.animate(
@@ -140,16 +147,18 @@ export function BeaverScreen({ meId, ageGroup }: { meId: number; ageGroup: strin
             { duration: 280, easing: 'ease-out' },
           )
         }, FLIGHT_MS)
-      }, i * THROW_GAP_MS)
+      }, PRE_WORK_MS + i * THROW_GAP_MS)
     }
     later(() => {
       setBusy(false)
+      setSpeech('Плотина готова!')
+      later(() => setSpeech(null), 1500)
       if (levelFor(cur).n > startLevel) {
         setConfetti(true)
         later(() => setConfetti(false), 2200)
         later(() => setLevelUp(levelFor(cur).n), 900)
       }
-    }, (spend - 1) * THROW_GAP_MS + FLIGHT_MS + 250)
+    }, PRE_WORK_MS + (spend - 1) * THROW_GAP_MS + FLIGHT_MS + 250)
   }
 
   const upLevel = DAM_LEVELS.find((l) => l.n === levelUp)
@@ -179,10 +188,17 @@ export function BeaverScreen({ meId, ageGroup }: { meId: number; ageGroup: strin
 
           <div ref={beaverRef} className="absolute bottom-1 left-2 h-[68%]">
             <img
-              src={sprite} alt="Бобёр" draggable={false}
-              className="anim-bob h-full select-none drop-shadow-[0_6px_6px_rgba(0,0,0,0.18)]"
+              src={busy ? spriteBuilder : sprite} alt="Бобёр" draggable={false}
+              onError={(e) => { if (!e.currentTarget.src.endsWith(sprite)) e.currentTarget.src = sprite }}
+              className={`${busy ? 'anim-work' : 'anim-bob'} h-full select-none drop-shadow-[0_6px_6px_rgba(0,0,0,0.18)]`}
             />
           </div>
+
+          {speech && (
+            <div key={speech} className="anim-speech pointer-events-none absolute right-3 top-14 z-10 max-w-[56%] rounded-2xl rounded-bl-md bg-white px-3.5 py-2 text-[13px] font-semibold text-[#141416] shadow-[0_6px_16px_-8px_rgba(0,0,0,0.45)]">
+              {speech}
+            </div>
+          )}
 
           {flying.map((id) => (
             <span

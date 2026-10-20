@@ -12,3 +12,7 @@
 .anim-pop { animation: pop-up .9s ease-out both; }
 @keyframes confetti-fall { 0% { opacity: 1; transform: translateY(0) rotate(0) } 100% { opacity: 0; transform: translateY(300px) rotate(540deg) } }
 .anim-confetti { animation: confetti-fall 1.6s ease-in both; }
+@keyframes beaver-work { 0%, 100% { transform: translateY(0) rotate(0) } 25% { transform: translateY(-3px) rotate(-1.5deg) } 75% { transform: translateY(0) rotate(1.5deg) } }
+.anim-work { animation: beaver-work .7s ease-in-out infinite; transform-origin: 50% 100%; }
+@keyframes speech-in { from { opacity: 0; transform: translateY(6px) scale(.92) } to { opacity: 1; transform: none } }
+.anim-speech { animation: speech-in .25s ease-out both; }
