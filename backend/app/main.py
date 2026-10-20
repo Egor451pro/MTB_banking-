@@ -8,7 +8,10 @@ from fastapi.responses import JSONResponse
 from contextlib import asynccontextmanager
 import os
 
-from app.db import init_db
+from sqlalchemy import func, select
+
+from app.db import AsyncSessionLocal, init_db
+from app.models import User
 from app.routers import (
     demo_router,
     family_router,
@@ -27,6 +30,13 @@ from app.schemas.common import HealthResponse
 async def lifespan(app: FastAPI):
     """Инициализация БД при старте приложения"""
     await init_db()
+    # Пустая база (первый запуск) — сразу заполняем демо-семьёй,
+    # чтобы не нужно было помнить про `python -m app.seed`
+    async with AsyncSessionLocal() as session:
+        users = (await session.execute(select(func.count(User.id)))).scalar() or 0
+    if users == 0:
+        from app.seed import seed_data
+        await seed_data()
     yield
 
 
@@ -38,13 +48,15 @@ app = FastAPI(
     lifespan=lifespan
 )
 
-# Настройка CORS для фронтенда
-CORS_ORIGIN = os.getenv("CORS_ORIGIN", "http://localhost:5173")
+# Настройка CORS для фронтенда.
+# По умолчанию разрешены все адреса: прототип открывают с ноутбука, телефона и через туннель.
+# Авторизации по cookie нет (только X-User-Id), поэтому credentials не нужны.
+CORS_ORIGINS = [o.strip() for o in os.getenv("CORS_ORIGIN", "*").split(",") if o.strip()]
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[CORS_ORIGIN],
-    allow_credentials=True,
+    allow_origins=CORS_ORIGINS,
+    allow_credentials="*" not in CORS_ORIGINS,
     allow_methods=["*"],
     allow_headers=["*"],
 )

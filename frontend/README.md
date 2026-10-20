@@ -16,12 +16,12 @@ npm run dev        # http://localhost:5173
 ## Подключение настоящего бэкенда
 
 ```bash
-cp .env.example .env
-# в .env: VITE_API_URL=http://localhost:8000
+cp .env.example .env    # VITE_API_URL=/api
 ```
 
+Запросы на `/api` прокси Vite пересылает бэкенду на `http://127.0.0.1:8000` (см. `vite.config.ts`).
 Все запросы идут через один интерфейс `Api` (`src/api/index.ts`): `real.ts` — fetch на FastAPI, `mock.ts` — in-memory.
-Заголовок `X-User-Id` берётся из демо-переключателя. На бэкенде нужен CORS для `http://localhost:5173`.
+Заголовок `X-User-Id` берётся из демо-переключателя.
 
 ## Показать на телефоне
 
