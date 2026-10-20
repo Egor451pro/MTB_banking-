@@ -15,3 +15,64 @@ input, select, button { font: inherit; }
 /* Прячем полосы прокрутки: в мобильном приложении их не видно, листать можно как обычно */
 * { scrollbar-width: none; }
 *::-webkit-scrollbar { display: none; }
+
+/* ───────── Анимации ─────────
+   Все движения короткие (200–500 мс) и с мягким замедлением в конце.
+   Пользователям с «уменьшить движение» в настройках системы анимации отключаются. */
+:root {
+  --ease-out: cubic-bezier(.22, 1, .36, 1);
+  --ease-sheet: cubic-bezier(.32, .72, 0, 1);
+}
+
+@keyframes fade-in   { from { opacity: 0 } to { opacity: 1 } }
+@keyframes fade-out  { from { opacity: 1 } to { opacity: 0 } }
+@keyframes rise-in   { from { opacity: 0; transform: translateY(14px) } to { opacity: 1; transform: none } }
+@keyframes sheet-in  { from { transform: translateY(100%) } to { transform: none } }
+@keyframes sheet-out { from { transform: none } to { transform: translateY(100%) } }
+@keyframes toast-in  { from { opacity: 0; transform: translateY(-14px) scale(.96) } to { opacity: 1; transform: none } }
+@keyframes toast-out { from { opacity: 1; transform: none } to { opacity: 0; transform: translateY(-10px) scale(.97) } }
+@keyframes pop-in    { 0% { opacity: 0; transform: scale(.4) } 60% { opacity: 1; transform: scale(1.12) } 100% { transform: none } }
+@keyframes dim-in    { from { background-color: rgba(20, 20, 22, 0) } }
+@keyframes dim-out   { to { background-color: rgba(20, 20, 22, 0) } }
+@keyframes tab-pop   { 0% { transform: scale(.82) } 55% { transform: scale(1.14) } 100% { transform: none } }
+
+/* Смена экрана: лёгкое проявление */
+/* backwards, а не both: после окончания анимация не должна оставлять opacity/transform,
+   иначе экран создаёт свой слой и шторка оказывается под нижним меню */
+.anim-screen { animation: fade-in .22s ease-out backwards; }
+
+/* Карточки экрана появляются по очереди снизу вверх.
+   Шапка (первый блок) только проявляется, шторки не трогаем. */
+.anim-screen > div:not(:first-child):not(.sheet-backdrop) > * {
+  animation: rise-in .5s var(--ease-out) backwards;
+}
+.anim-screen > div:not(:first-child):not(.sheet-backdrop) > :nth-child(1)  { animation-delay: 30ms }
+.anim-screen > div:not(:first-child):not(.sheet-backdrop) > :nth-child(2)  { animation-delay: 70ms }
+.anim-screen > div:not(:first-child):not(.sheet-backdrop) > :nth-child(3)  { animation-delay: 110ms }
+.anim-screen > div:not(:first-child):not(.sheet-backdrop) > :nth-child(4)  { animation-delay: 150ms }
+.anim-screen > div:not(:first-child):not(.sheet-backdrop) > :nth-child(5)  { animation-delay: 190ms }
+.anim-screen > div:not(:first-child):not(.sheet-backdrop) > :nth-child(6)  { animation-delay: 230ms }
+.anim-screen > div:not(:first-child):not(.sheet-backdrop) > :nth-child(n+7) { animation-delay: 270ms }
+
+/* Шторка снизу */
+/* Растворяется только затемнение, само окно остаётся непрозрачным */
+.anim-backdrop     { animation: dim-in .25s ease-out both; }
+.anim-backdrop-out { animation: dim-out .24s ease-in both; }
+.anim-sheet        { animation: sheet-in .42s var(--ease-sheet) both; }
+.anim-sheet-out    { animation: sheet-out .24s ease-in both; }
+
+/* Уведомление сверху */
+.anim-toast     { animation: toast-in .32s var(--ease-out) both; }
+.anim-toast-out { animation: toast-out .24s ease-in both; }
+
+/* Появление значка результата и активной вкладки */
+.anim-pop { animation: pop-in .45s var(--ease-out) both; }
+.anim-tab { display: inline-flex; animation: tab-pop .38s var(--ease-out); }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: .01ms !important;
+    animation-delay: 0ms !important;
+    transition-duration: .01ms !important;
+  }
+}

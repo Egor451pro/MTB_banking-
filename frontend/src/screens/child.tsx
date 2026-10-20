@@ -141,7 +141,7 @@ export function ChildPay({ meId }: { meId: number }) {
       <Sheet open={!!res} onClose={() => setRes(null)}>
         {res && (
           <div className="flex flex-col items-center text-center">
-            <div className={`flex h-16 w-16 items-center justify-center rounded-full ${result === 'approved' ? 'bg-[#2F6FE4] text-white' : result === 'pending' ? 'bg-mt-sky/50 text-mt-ink' : 'bg-mt-red text-white'}`}>
+            <div className={`anim-pop flex h-16 w-16 items-center justify-center rounded-full ${result === 'approved' ? 'bg-[#2F6FE4] text-white' : result === 'pending' ? 'bg-mt-sky/50 text-mt-ink' : 'bg-mt-red text-white'}`}>
               <Icon name={result === 'approved' ? 'check' : result === 'pending' ? 'clock' : 'x'} size={32} strokeWidth={2.4} />
             </div>
             <div className="mt-4 text-[22px] font-bold tracking-tight text-mt-ink">

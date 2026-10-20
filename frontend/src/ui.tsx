@@ -1,4 +1,4 @@
-import { useEffect, useState, type ReactNode } from 'react'
+import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { money } from './format'
 import { Icon, type IconName } from './icons'
 import type { Card as CardT } from './types'
@@ -15,19 +15,62 @@ const GRAD = 'bg-gradient-to-b from-[#3D74EC] to-[#2B5FDB]'
 export const toast = (msg: string) => window.dispatchEvent(new CustomEvent('app-toast', { detail: msg }))
 
 export function ToastHost() {
-  const [msg, setMsg] = useState<string | null>(null)
+  const [msg, setMsg] = useState<{ text: string; id: number; leaving: boolean } | null>(null)
   useEffect(() => {
-    let t: ReturnType<typeof setTimeout>
-    const h = (e: Event) => { setMsg((e as CustomEvent<string>).detail); clearTimeout(t); t = setTimeout(() => setMsg(null), 2800) }
+    let t: ReturnType<typeof setTimeout>, t2: ReturnType<typeof setTimeout>
+    const h = (e: Event) => {
+      clearTimeout(t); clearTimeout(t2)
+      setMsg({ text: (e as CustomEvent<string>).detail, id: Date.now(), leaving: false })
+      t = setTimeout(() => setMsg((m) => (m ? { ...m, leaving: true } : m)), 2600)
+      t2 = setTimeout(() => setMsg(null), 2850)
+    }
     window.addEventListener('app-toast', h)
-    return () => { window.removeEventListener('app-toast', h); clearTimeout(t) }
+    return () => { window.removeEventListener('app-toast', h); clearTimeout(t); clearTimeout(t2) }
   }, [])
   if (!msg) return null
   return (
-    <div className="pointer-events-none absolute inset-x-4 top-4 z-50 rounded-2xl bg-mt-ink/90 px-4 py-3 text-center text-sm font-medium text-white shadow-lg backdrop-blur">
-      {msg}
+    <div
+      key={msg.id}
+      className={`pointer-events-none absolute inset-x-4 top-4 z-50 rounded-2xl bg-mt-ink/90 px-4 py-3 text-center text-sm font-medium text-white shadow-lg backdrop-blur ${msg.leaving ? 'anim-toast-out' : 'anim-toast'}`}
+    >
+      {msg.text}
     </div>
   )
+}
+
+// Плавно «докручивает» число до нового значения (для сумм на картах)
+export function useCountUp(value: number, ms = 650): number {
+  const [shown, setShown] = useState(value)
+  const from = useRef(value)
+  useEffect(() => {
+    const start = from.current
+    if (start === value || window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) {
+      from.current = value; setShown(value); return
+    }
+    const t0 = performance.now()
+    let raf = 0
+    const tick = (now: number) => {
+      const k = Math.min(1, (now - t0) / ms)
+      const e = 1 - Math.pow(1 - k, 3)
+      const v = Math.round(start + (value - start) * e)
+      from.current = v
+      setShown(v)
+      if (k < 1) raf = requestAnimationFrame(tick)
+    }
+    raf = requestAnimationFrame(tick)
+    return () => cancelAnimationFrame(raf)
+  }, [value, ms])
+  return shown
+}
+
+// Значение, которое на первом кадре равно 0, а потом плавно растёт (для полосок и колец)
+export function useGrow(target: number): number {
+  const [v, setV] = useState(0)
+  useEffect(() => {
+    const r = requestAnimationFrame(() => setV(target))
+    return () => cancelAnimationFrame(r)
+  }, [target])
+  return v
 }
 
 // ───────── Поверхности ─────────
@@ -117,11 +160,11 @@ export function Badge({ children, tone = 'blue' }: { children: ReactNode; tone?:
 
 // tone="brand" — фирменная пара красный→оранжевый, только для опыта и уровня
 export function Progress({ value, max, tone = 'blue' }: { value: number; max: number; tone?: 'blue' | 'brand' }) {
-  const pct = max > 0 ? Math.min(100, Math.max(0, Math.round((value / max) * 100))) : 0
+  const pct = useGrow(max > 0 ? Math.min(100, Math.max(0, Math.round((value / max) * 100))) : 0)
   return (
     <div className="h-2 w-full overflow-hidden rounded-full bg-[#EEF0F4]">
       <div
-        className={`h-full rounded-full transition-all ${tone === 'brand' ? 'bg-gradient-to-r from-mt-red to-mt-orange' : 'bg-gradient-to-r from-[#6AA6F3] to-[#2B5FDB]'}`}
+        className={`h-full rounded-full transition-[width] duration-700 ease-[cubic-bezier(.22,1,.36,1)] ${tone === 'brand' ? 'bg-gradient-to-r from-mt-red to-mt-orange' : 'bg-gradient-to-r from-[#6AA6F3] to-[#2B5FDB]'}`}
         style={{ width: `${pct}%` }}
       />
     </div>
@@ -201,13 +244,19 @@ export function Field({ label, value, onChange, placeholder, type = 'text', inpu
 export function Segmented<T extends string | number>({ options, value, onChange }: {
   options: { id: T; label: string }[]; value: T; onChange: (v: T) => void
 }) {
+  // Синяя «таблетка» плавно переезжает под выбранный вариант
+  const idx = Math.max(0, options.findIndex((o) => o.id === value))
   return (
-    <div className="flex rounded-2xl bg-white p-1">
+    <div className="relative flex rounded-2xl bg-white p-1">
+      <div
+        className={`absolute bottom-1 left-1 top-1 rounded-xl ${GRAD} shadow-[0_6px_14px_-8px_rgba(43,95,219,0.8)] transition-transform duration-300 ease-[cubic-bezier(.22,1,.36,1)]`}
+        style={{ width: `calc((100% - 8px) / ${options.length})`, transform: `translateX(${idx * 100}%)` }}
+      />
       {options.map((o) => (
         <button
           key={String(o.id)}
           onClick={() => onChange(o.id)}
-          className={`h-9 flex-1 rounded-xl px-2 text-sm font-semibold transition ${value === o.id ? `${GRAD} text-white` : 'text-muted'}`}
+          className={`relative h-9 flex-1 rounded-xl px-2 text-sm font-semibold transition-colors duration-300 ${value === o.id ? 'text-white' : 'text-muted'}`}
         >
           {o.label}
         </button>
@@ -217,14 +266,33 @@ export function Segmented<T extends string | number>({ options, value, onChange 
 }
 
 // ───────── Шторка ─────────
+// Выезжает снизу и уезжает обратно; на время закрытия держим последнее содержимое
 export function Sheet({ open, onClose, title, children }: { open: boolean; onClose: () => void; title?: string; children: ReactNode }) {
-  if (!open) return null
+  const [mounted, setMounted] = useState(open)
+  const [leaving, setLeaving] = useState(false)
+  const last = useRef<{ title?: string; children: ReactNode }>({ title, children })
+  if (open) last.current = { title, children }
+  useEffect(() => {
+    if (open) { setMounted(true); setLeaving(false); return }
+    if (!mounted) return
+    setLeaving(true)
+    const t = setTimeout(() => { setMounted(false); setLeaving(false) }, 240)
+    return () => clearTimeout(t)
+  }, [open]) // eslint-disable-line react-hooks/exhaustive-deps
+  if (!open && !mounted) return null
+  const c = last.current
   return (
-    <div className="absolute inset-0 z-30 flex items-end bg-mt-ink/45" onClick={onClose}>
-      <div className="max-h-[88%] w-full overflow-y-auto rounded-t-[28px] bg-white px-5 pb-8 pt-3" onClick={(e) => e.stopPropagation()}>
+    <div
+      className={`sheet-backdrop absolute inset-0 z-30 flex items-end bg-mt-ink/45 ${leaving ? 'anim-backdrop-out pointer-events-none' : 'anim-backdrop'}`}
+      onClick={onClose}
+    >
+      <div
+        className={`max-h-[88%] w-full overflow-y-auto rounded-t-[28px] bg-white px-5 pb-8 pt-3 ${leaving ? 'anim-sheet-out' : 'anim-sheet'}`}
+        onClick={(e) => e.stopPropagation()}
+      >
         <div className="mx-auto mb-4 h-1 w-10 rounded-full bg-[#D5DAE2]" />
-        {title && <h3 className="mb-4 text-xl font-bold tracking-tight text-mt-ink">{title}</h3>}
-        {children}
+        {c.title && <h3 className="mb-4 text-xl font-bold tracking-tight text-mt-ink">{c.title}</h3>}
+        {c.children}
       </div>
     </div>
   )
@@ -257,7 +325,7 @@ export function Header({ title, subtitle, onBack, right, tall }: {
 // ───────── Баланс ─────────
 // Рубли крупно, копейки и валюта мельче — сумма читается с одного взгляда
 export function MoneyBig({ cents, muted }: { cents: number; muted?: boolean }) {
-  const s = money(cents)
+  const s = money(useCountUp(cents))
   const i = s.indexOf(',')
   return (
     <span className={`tabular-nums ${muted ? 'text-[#A3ABB8]' : 'text-mt-ink'}`}>
@@ -324,7 +392,7 @@ export function BottomNav({ tabs, active, onChange }: { tabs: TabDef[]; active: 
             key={t.id} onClick={() => onChange(t.id)}
             className={`relative flex flex-1 flex-col items-center gap-0.5 rounded-[22px] py-2 text-[11px] font-semibold transition ${on ? `bg-[#EEF0F4] ${BLUE}` : 'text-mt-ink'}`}
           >
-            <Icon name={t.icon} size={24} strokeWidth={on ? 2 : 1.7} />
+            <span key={on ? 'on' : 'off'} className={on ? 'anim-tab' : ''}><Icon name={t.icon} size={24} strokeWidth={on ? 2 : 1.7} /></span>
             {t.label}
             {!!t.badge && (
               <span className="absolute left-1/2 top-1 ml-2 flex h-[18px] min-w-[18px] items-center justify-center rounded-full bg-mt-red px-1 text-[10px] font-bold text-white">

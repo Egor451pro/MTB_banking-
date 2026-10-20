@@ -36,10 +36,15 @@ function ParentShell() {
   else body = <ParentHome />
   return (
     <>
-      <div className="flex-1 overflow-y-auto">{body}</div>
+      <div className="flex-1 overflow-y-auto"><div key={screenKey(tab, top)} className="anim-screen">{body}</div></div>
       <BottomNav tabs={tabs} active={tab} onChange={setTab} />
     </>
   )
+}
+
+// Ключ экрана: при его смене экран плавно появляется заново
+function screenKey(tab: string, top?: { name: string; params?: Record<string, unknown> }) {
+  return top ? `${top.name}:${JSON.stringify(top.params ?? {})}` : `tab:${tab}`
 }
 
 function ChildShell({ me }: { me: Me }) {
@@ -63,7 +68,7 @@ function ChildShell({ me }: { me: Me }) {
   else body = <ChildHome meId={me.id} />
   return (
     <>
-      <div className="flex-1 overflow-y-auto">{body}</div>
+      <div className="flex-1 overflow-y-auto"><div key={screenKey(tab, top)} className="anim-screen">{body}</div></div>
       <BottomNav tabs={tabs} active={tab} onChange={setTab} />
     </>
   )

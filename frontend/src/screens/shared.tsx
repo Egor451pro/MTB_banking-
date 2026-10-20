@@ -3,7 +3,7 @@ import { api } from '../api'
 import { CATEGORY_ICON, CATEGORY_LABEL, DECLINE_TEXT, PERMISSION_INFO, dateTime, money } from '../format'
 import { useData } from '../hooks'
 import { Icon } from '../icons'
-import { Badge, Btn, Card, Empty, Header, IconTile, Loading, Progress, Section, Sheet, type BadgeTone } from '../ui'
+import { Badge, Btn, Card, Empty, Header, IconTile, Loading, Progress, Section, Sheet, useGrow, type BadgeTone } from '../ui'
 import type { AccessRequest, ChildDetail, Goal, Task, Transaction } from '../types'
 
 export function TxRow({ t, who }: { t: Transaction; who?: string }) {
@@ -107,7 +107,7 @@ export const REQ_ICON = { money: 'wallet', limit_increase: 'arrow-up', category_
 // Уровень показываем из GET /children/{id}: уровень — мотивация ребёнка, права меняет только родитель
 export function LevelRing({ level }: { level: ChildDetail['level'] }) {
   const next = level.xp + level.xp_to_next
-  const pct = level.xp_to_next > 0 && next > 0 ? level.xp / next : 1
+  const pct = useGrow(level.xp_to_next > 0 && next > 0 ? level.xp / next : 1)
   const r = 52
   const c = 2 * Math.PI * r
   return (
@@ -122,6 +122,7 @@ export function LevelRing({ level }: { level: ChildDetail['level'] }) {
       <circle
         cx="64" cy="64" r={r} fill="none" stroke="url(#lvl)" strokeWidth="10" strokeLinecap="round"
         strokeDasharray={`${c * pct} ${c}`} transform="rotate(-90 64 64)"
+        style={{ transition: 'stroke-dasharray 1s cubic-bezier(.22,1,.36,1)' }}
       />
       <text x="64" y="62" textAnchor="middle" fontSize="40" fontWeight="800" fill="#141416">{level.level}</text>
       <text x="64" y="84" textAnchor="middle" fontSize="12" fontWeight="600" fill="#5E6878">уровень</text>
