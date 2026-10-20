@@ -16,7 +16,7 @@ const CATS: Category[] = ['food', 'transport', 'education', 'shopping', 'enterta
 // ───────── Главная родителя ─────────
 export function ParentHome() {
   const { push, setTab } = useNav()
-  const { data, reload } = useData(() => api.getFamily(), [], 3000)
+  const { data } = useData(() => api.getFamily(), [], 3000)
   const pp = useData(() => api.listPendingPurchases(), [], 3000)
   if (!data) return <><Header title="Семья" /><Loading /></>
   const pending = data.children.reduce((s, c) => s + c.pending_requests, 0)
@@ -67,10 +67,6 @@ export function ParentHome() {
         </Section>
 
         <FamilyFeed kids={data.children} />
-
-        <button onClick={async () => { await api.demoReset(); await reload(); toast('Демо-данные сброшены') }} className="mx-auto flex items-center gap-1.5 py-2 text-xs font-medium text-muted">
-          <Icon name="refresh" size={14} />Сбросить демо-данные
-        </button>
       </div>
     </>
   )

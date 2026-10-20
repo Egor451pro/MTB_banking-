@@ -1,7 +1,7 @@
 import { useEffect, useState, type ReactNode } from 'react'
 import { api, session, usingMock, type LoginResult } from './api'
 import { NavProvider, useNav } from './nav'
-import { BonusBannerHost, BottomNav, ToastHost, Loading, type TabDef } from './ui'
+import { BonusBannerHost, BottomNav, ToastHost, Loading, toast, type TabDef } from './ui'
 import { useData } from './hooks'
 import type { Me } from './types'
 import { ChildGoals, ChildHome, ChildLevel, ChildPay, ChildTasks, LessonScreen, RequestScreen } from './screens/child'
@@ -183,6 +183,16 @@ function IPhoneFrame({ children }: { children: ReactNode }) {
 export default function App() {
   const [user, setUser] = useState<LoginResult | null>(null)
   const { theme, toggle } = useTheme()
+  // Сброс демо: данные на сервере/в mock, локальные прогрессы (бобёр, баннеры бонусов) и перезагрузка экранов
+  const [resetKey, setResetKey] = useState(0)
+  const resetDemo = async () => {
+    await api.demoReset()
+    try {
+      Object.keys(localStorage).filter((k) => k.startsWith('beaver:') || k.startsWith('bonusSeen:')).forEach((k) => localStorage.removeItem(k))
+    } catch { /* без хранилища нечего чистить */ }
+    setResetKey((k) => k + 1)
+    toast('Демо-данные сброшены')
+  }
   // session.userId выставляется до рендера экранов, чтобы первый запрос ушёл от нужного пользователя
   if (user) session.userId = user.id
 
@@ -206,6 +216,14 @@ export default function App() {
         )}
         <button
           type="button"
+          onClick={resetDemo}
+          title="Сбросить демо-данные"
+          className="flex items-center gap-1 rounded-full bg-elevated px-3 py-1 text-[13px] font-semibold text-muted transition hover:text-mt-ink"
+        >
+          <Icon name="refresh" size={14} />Сбросить демо
+        </button>
+        <button
+          type="button"
           onClick={toggle}
           aria-label={theme === 'dark' ? 'Светлая тема' : 'Тёмная тема'}
           title={theme === 'dark' ? 'Светлая тема' : 'Тёмная тема'}
@@ -218,7 +236,7 @@ export default function App() {
         <ToastHost />
         <BonusBannerHost />
         {user
-          ? <div className="flex min-h-0 flex-1 flex-col pb-3"><Phone key={user.id} uid={user.id} /></div>
+          ? <div className="flex min-h-0 flex-1 flex-col pb-3"><Phone key={`${user.id}:${resetKey}`} uid={user.id} /></div>
           : <div className="flex-1 overflow-y-auto pb-5"><LoginScreen onSuccess={setUser} /></div>}
       </IPhoneFrame>
     </div>
