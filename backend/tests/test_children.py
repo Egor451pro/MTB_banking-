@@ -12,7 +12,7 @@ async def test_get_child_profile_same_family_parent(client: AsyncClient, seed_te
     Родитель может просматривать профиль ребенка из своей семьи.
     Ожидаем: статус 200
     """
-    data = await seed_test_data
+    data = seed_test_data
     parent_id = data["family1_parent_id"]  # Мама Иванова (id=1)
     child_id = data["family1_child_id"]    # Миша (id=2)
     
@@ -36,7 +36,7 @@ async def test_get_child_profile_other_family_parent(client: AsyncClient, seed_t
     Родитель НЕ может просматривать профиль ребенка из чужой семьи.
     Ожидаем: статус 403 с ошибкой "forbidden"
     """
-    data = await seed_test_data
+    data = seed_test_data
     parent_id = data["family1_parent_id"]   # Мама Иванова (id=1)
     other_child_id = data["family2_child_id"]  # Ваня из семьи 2 (id=4)
     
@@ -57,7 +57,7 @@ async def test_get_child_profile_self(client: AsyncClient, seed_test_data):
     Ребенок может просматривать свой собственный профиль.
     Ожидаем: статус 200
     """
-    data = await seed_test_data
+    data = seed_test_data
     child_id = data["family1_child_id"]  # Миша (id=2)
     
     response = await client.get(
@@ -77,7 +77,7 @@ async def test_get_child_profile_other_child(client: AsyncClient, seed_test_data
     Ребенок НЕ может просматривать профиль другого ребенка.
     Ожидаем: статус 403 с ошибкой "forbidden"
     """
-    data = await seed_test_data
+    data = seed_test_data
     child1_id = data["family1_child_id"]  # Миша (id=2)
     child2_id = data["family2_child_id"]  # Ваня (id=4)
     
@@ -96,7 +96,7 @@ async def test_get_child_profile_not_found(client: AsyncClient, seed_test_data):
     """
     Запрос несуществующего ребенка должен возвращать 404.
     """
-    data = await seed_test_data
+    data = seed_test_data
     parent_id = data["family1_parent_id"]
     non_existent_id = 9999
     

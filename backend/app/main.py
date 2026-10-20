@@ -1,13 +1,15 @@
 """
 Главное приложение FastAPI для бэкенда "Семейный банкинг в Moby"
 """
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException, Request
+from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 from contextlib import asynccontextmanager
 import os
 
 from app.db import init_db
-from app.routers import user_router, family_router
+from app.routers import user_router, family_router, goal_router
 from app.schemas.common import HealthResponse
 
 
@@ -40,6 +42,31 @@ app.add_middleware(
 # Подключение роутеров
 app.include_router(user_router, tags=["Users"])
 app.include_router(family_router, tags=["Family"])
+app.include_router(goal_router, tags=["Goals"])
+
+
+@app.exception_handler(HTTPException)
+async def http_exception_handler(_: Request, exc: HTTPException):
+    # Все ошибки API отдаем в едином формате контракта
+    if isinstance(exc.detail, dict) and "error" in exc.detail and "message" in exc.detail:
+        return JSONResponse(status_code=exc.status_code, content=exc.detail)
+
+    fallback_map = {
+        403: ("forbidden", "Доступ запрещен"),
+        404: ("not_found", "Ресурс не найден"),
+        409: ("conflict", "Конфликт данных"),
+        422: ("validation_error", "Некорректный запрос"),
+    }
+    error, message = fallback_map.get(exc.status_code, ("validation_error", str(exc.detail)))
+    return JSONResponse(status_code=exc.status_code, content={"error": error, "message": message})
+
+
+@app.exception_handler(RequestValidationError)
+async def request_validation_exception_handler(_: Request, __: RequestValidationError):
+    return JSONResponse(
+        status_code=422,
+        content={"error": "validation_error", "message": "Некорректный запрос"},
+    )
 
 
 @app.get("/health", response_model=HealthResponse, tags=["Health"])
