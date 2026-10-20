@@ -21,3 +21,8 @@ Thumbs.db
 *.log
 *.sqlite3
 *.db
+
+# frontend
+node_modules/
+dist/
+.env.local
