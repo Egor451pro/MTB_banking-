@@ -1,7 +1,8 @@
 """
 Pydantic схемы для семьи
 """
-from pydantic import BaseModel
+from datetime import date
+from pydantic import BaseModel, Field
 from typing import List, Literal
 from .user import AgeGroup, CardInfo
 
@@ -27,3 +28,19 @@ class FamilyResponse(BaseModel):
     """GET /family - семья и дети (только для родителя)"""
     family: FamilyInfo
     children: List[FamilyChildSummary]
+
+
+ConsentType = Literal["card_issue", "moby_access", "online_payments"]
+
+
+class CreatePackageRequest(BaseModel):
+    child_name: str = Field(min_length=1, max_length=255)
+    child_birth_date: date
+    consents: List[ConsentType]
+
+
+class CreatePackageResponse(BaseModel):
+    child_id: int
+    card_id: int
+    age_group: AgeGroup
+    consents: List[ConsentType]

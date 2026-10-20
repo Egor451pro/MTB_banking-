@@ -9,7 +9,17 @@ from contextlib import asynccontextmanager
 import os
 
 from app.db import init_db
-from app.routers import user_router, family_router, goal_router
+from app.routers import (
+    demo_router,
+    family_router,
+    goal_router,
+    limit_router,
+    payment_router,
+    request_router,
+    task_router,
+    transaction_router,
+    user_router,
+)
 from app.schemas.common import HealthResponse
 
 
@@ -43,6 +53,12 @@ app.add_middleware(
 app.include_router(user_router, tags=["Users"])
 app.include_router(family_router, tags=["Family"])
 app.include_router(goal_router, tags=["Goals"])
+app.include_router(limit_router, tags=["Limits"])
+app.include_router(payment_router, tags=["Payments"])
+app.include_router(request_router, tags=["Requests"])
+app.include_router(task_router, tags=["Tasks"])
+app.include_router(transaction_router, tags=["Transactions"])
+app.include_router(demo_router, tags=["Demo"])
 
 
 @app.exception_handler(HTTPException)

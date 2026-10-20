@@ -8,7 +8,7 @@ from typing import Annotated
 from app.db import get_db
 from app.deps import require_parent
 from app.models import User
-from app.schemas.family import FamilyResponse
+from app.schemas.family import CreatePackageRequest, CreatePackageResponse, FamilyResponse
 from app.services.family_service import FamilyService
 
 router = APIRouter()
@@ -25,3 +25,12 @@ async def get_family(
     Доступ: только родитель.
     """
     return await FamilyService.get_family(parent, db)
+
+
+@router.post("/family/package", response_model=CreatePackageResponse, status_code=201)
+async def create_family_package(
+    request: CreatePackageRequest,
+    parent: Annotated[User, Depends(require_parent)],
+    db: AsyncSession = Depends(get_db),
+):
+    return await FamilyService.create_package(parent=parent, request=request, db=db)
