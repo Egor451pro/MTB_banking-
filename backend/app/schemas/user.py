@@ -55,3 +55,16 @@ class ChildProfileResponse(BaseModel):
     limits_today: LimitsToday
     level: LevelInfo
     permissions: Permissions
+
+
+class TopupRequest(BaseModel):
+    amount_cents: int = Field(..., gt=0)
+
+
+class TopupResponse(BaseModel):
+    balance_cents: int
+
+
+class CardStatusResponse(BaseModel):
+    id: int
+    status: Literal["active", "blocked"]

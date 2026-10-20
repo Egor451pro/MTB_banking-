@@ -1,12 +1,34 @@
 """
 Бизнес-логика для работы с семьей
 """
+import random
+from datetime import date
+
+from fastapi import HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func
 from typing import List
 
-from app.models import User, Family, Account, AccessRequest, RequestStatus, UserRole
-from app.schemas.family import FamilyResponse, FamilyInfo, FamilyChildSummary
+from app.models import (
+    User,
+    Family,
+    Account,
+    AccessRequest,
+    RequestStatus,
+    UserRole,
+    AccountType,
+    AccountStatus,
+    Limit,
+    LimitPeriod,
+    Consent,
+)
+from app.schemas.family import (
+    FamilyResponse,
+    FamilyInfo,
+    FamilyChildSummary,
+    CreatePackageRequest,
+    CreatePackageResponse,
+)
 from app.schemas.user import CardInfo
 from app.services.user_service import UserService
 
@@ -93,3 +115,79 @@ class FamilyService:
             family=family_info,
             children=children_summaries
         )
+
+    @staticmethod
+    async def create_package(parent: User, request: CreatePackageRequest, db: AsyncSession) -> CreatePackageResponse:
+        child_age = FamilyService._calculate_age(request.child_birth_date)
+        if child_age < 7 or child_age > 17:
+            raise HTTPException(
+                status_code=422,
+                detail={"error": "validation_error", "message": "Пакет выпускается для детей 7–17 лет"},
+            )
+        child_name = request.child_name.strip()
+        if not child_name:
+            raise HTTPException(status_code=422, detail={"error": "validation_error", "message": "Укажите имя ребёнка"})
+
+        child = User(
+            family_id=parent.family_id,
+            role=UserRole.CHILD,
+            name=child_name,
+            birth_date=request.child_birth_date,
+            xp=0,
+            level=1,
+            points=0,
+        )
+        db.add(child)
+        await db.flush()
+
+        account = Account(
+            owner_id=child.id,
+            type=AccountType.CARD,
+            balance_cents=0,
+            currency="BYN",
+            status=AccountStatus.ACTIVE,
+            card_last4=f"{random.randint(1000, 9999)}",
+        )
+        db.add(account)
+
+        # Базовые лимиты для нового ребёнка.
+        db.add(
+            Limit(
+                child_id=child.id,
+                category=None,
+                period=LimitPeriod.DAY,
+                amount_cents=1000,
+                is_blocked=False,
+            )
+        )
+        db.add(
+            Limit(
+                child_id=child.id,
+                category="games",
+                period=LimitPeriod.DAY,
+                amount_cents=0,
+                is_blocked=True,
+            )
+        )
+
+        if child_age < 14 and "online_payments" in request.consents:
+            raise HTTPException(
+                status_code=422,
+                detail={"error": "validation_error", "message": "Онлайн-платежи доступны только для 14-17 лет"},
+            )
+
+        for consent in request.consents:
+            db.add(Consent(child_id=child.id, consent_type=consent))
+
+        await db.flush()
+        return CreatePackageResponse(
+            child_id=child.id,
+            card_id=account.id,
+            age_group=UserService.calculate_age_group(child.birth_date),
+            consents=request.consents,
+        )
+
+    @staticmethod
+    def _calculate_age(birth_date: date) -> int:
+        today = date.today()
+        return today.year - birth_date.year - ((today.month, today.day) < (birth_date.month, birth_date.day))

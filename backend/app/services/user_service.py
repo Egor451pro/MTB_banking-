@@ -4,7 +4,7 @@
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func
 from datetime import date, datetime
-from typing import Literal
+from typing import Optional
 import pytz
 
 from app.models import User, Account, Limit, Transaction, TransactionStatus, TransactionDirection, Consent
@@ -55,6 +55,51 @@ class UserService:
             if xp >= step:
                 level = i + 1
         return level
+
+    @staticmethod
+    def get_start_of_day_utc_naive(now_minsk: Optional[datetime] = None) -> datetime:
+        """
+        Возвращает начало текущего дня по Europe/Minsk в виде наивного UTC datetime.
+        Это нужно для корректного сравнения с Transaction.created_at, который хранится как UTC naive.
+        """
+        minsk_tz = pytz.timezone("Europe/Minsk")
+        now = now_minsk or datetime.now(minsk_tz)
+        start_of_day = now.replace(hour=0, minute=0, second=0, microsecond=0)
+        start_of_day_utc = start_of_day.astimezone(pytz.utc).replace(tzinfo=None)
+        return start_of_day_utc
+
+    @staticmethod
+    async def calculate_spent_today_cents(
+        db: AsyncSession,
+        account_id: int,
+        category: Optional[str] = None,
+        now_minsk: Optional[datetime] = None,
+    ) -> int:
+        """
+        Считает одобренные траты за текущий день (Europe/Minsk).
+        """
+        start_of_day_utc = UserService.get_start_of_day_utc_naive(now_minsk=now_minsk)
+        filters = [
+            Transaction.account_id == account_id,
+            Transaction.direction == TransactionDirection.OUT,
+            Transaction.status == TransactionStatus.APPROVED,
+            Transaction.created_at >= start_of_day_utc,
+        ]
+        if category is not None:
+            filters.append(Transaction.category == category)
+
+        result = await db.execute(select(func.sum(Transaction.amount_cents)).where(*filters))
+        return result.scalar() or 0
+
+    @staticmethod
+    async def has_online_payments_permission(db: AsyncSession, child_id: int) -> bool:
+        result = await db.execute(
+            select(Consent).where(
+                Consent.child_id == child_id,
+                Consent.consent_type == "online_payments",
+            )
+        )
+        return result.scalar_one_or_none() is not None
     
     @staticmethod
     async def get_me(user: User) -> MeResponse:
@@ -103,20 +148,8 @@ class UserService:
         general_limit = result.scalar_one_or_none()
         
         # Рассчитываем траты за сегодня (Europe/Minsk)
-        minsk_tz = pytz.timezone("Europe/Minsk")
-        now = datetime.now(minsk_tz)
-        start_of_day = now.replace(hour=0, minute=0, second=0, microsecond=0)
-        
         if account:
-            result = await db.execute(
-                select(func.sum(Transaction.amount_cents)).where(
-                    Transaction.account_id == account.id,
-                    Transaction.direction == TransactionDirection.OUT,
-                    Transaction.status == TransactionStatus.APPROVED,
-                    Transaction.created_at >= start_of_day
-                )
-            )
-            spent_cents = result.scalar() or 0
+            spent_cents = await UserService.calculate_spent_today_cents(db=db, account_id=account.id)
         else:
             spent_cents = 0
         
@@ -142,17 +175,7 @@ class UserService:
         )
         
         # Проверяем разрешение на онлайн-платежи (из таблицы consents)
-        result = await db.execute(
-            select(Consent).where(
-                Consent.child_id == child.id,
-                Consent.consent_type == "online_payments"
-            )
-        )
-        online_consent = result.scalar_one_or_none()
-        
-        permissions = Permissions(
-            online_payments=online_consent is not None
-        )
+        permissions = Permissions(online_payments=await UserService.has_online_payments_permission(db, child.id))
         
         return ChildProfileResponse(
             id=child.id,
