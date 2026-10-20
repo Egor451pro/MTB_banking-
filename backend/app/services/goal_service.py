@@ -3,7 +3,6 @@
 """
 from datetime import datetime
 
-import pytz
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import func, select
 from fastapi import HTTPException
@@ -17,29 +16,8 @@ from app.schemas.goal import (
 )
 
 
-# Бонус родителя начисляется при каждом взносе, но не больше этой суммы в месяц на ребёнка
-MONTHLY_BONUS_CAP_CENTS = 1000
 # Если один взнос больше этой суммы, бонус к нему не начисляется сам — его подтверждает родитель
 BONUS_CONFIRM_DEPOSIT_CENTS = 1000
-
-
-def _month_start_utc() -> datetime:
-    """Начало текущего месяца по Минску в naive UTC (как хранятся даты в БД)."""
-    minsk = pytz.timezone("Europe/Minsk")
-    now = datetime.now(minsk)
-    start = minsk.localize(datetime(now.year, now.month, 1))
-    return start.astimezone(pytz.utc).replace(tzinfo=None)
-
-
-async def _bonus_spent_this_month(child_id: int, db: AsyncSession) -> int:
-    result = await db.execute(
-        select(func.coalesce(func.sum(GoalBonus.amount_cents), 0)).where(
-            GoalBonus.child_id == child_id,
-            GoalBonus.status != "rejected",
-            GoalBonus.created_at >= _month_start_utc(),
-        )
-    )
-    return int(result.scalar_one())
 
 
 class GoalService:
@@ -76,12 +54,7 @@ class GoalService:
             for goal in goals
         ]
 
-        spent = await _bonus_spent_this_month(child_id, db)
-        return GoalsListResponse(
-            items=items,
-            bonus_month_cap_cents=MONTHLY_BONUS_CAP_CENTS,
-            bonus_month_left_cents=max(0, MONTHLY_BONUS_CAP_CENTS - spent),
-        )
+        return GoalsListResponse(items=items)
     
     @staticmethod
     async def create_goal(
@@ -185,11 +158,8 @@ class GoalService:
                 detail={"error": "validation_error", "message": "На карте не хватает денег"}
             )
         
-        # Бонус родителя: процент от взноса, но не больше остатка месячного лимита
-        bonus_left = max(0, MONTHLY_BONUS_CAP_CENTS - await _bonus_spent_this_month(child.id, db))
-        bonus = 0
-        if goal.parent_bonus_percent > 0:
-            bonus = min(amount_cents * goal.parent_bonus_percent // 100, bonus_left)
+        # Бонус родителя: процент от взноса, без ограничения по сумме
+        bonus = amount_cents * goal.parent_bonus_percent // 100
 
         # Бонус к крупному взносу (больше 10 BYN) ждёт подтверждения родителя, остальные начисляются сразу
         needs_confirm = bonus > 0 and amount_cents > BONUS_CONFIRM_DEPOSIT_CENTS
@@ -215,7 +185,6 @@ class GoalService:
             card_balance_cents=account.balance_cents,
             bonus_cents=credited,
             bonus_pending_cents=bonus if needs_confirm else 0,
-            bonus_left_cents=bonus_left - bonus,
             status=goal.status.value
         )
     

@@ -29,15 +29,12 @@ interface DB {
   allowance: Record<number, Omit<Allowance, 'next_date'>>
   lessonsDone: Record<number, number[]>
   bonuses: { id: number; child_id: number; goal_id: number; amount_cents: number; status: 'pending' | 'credited' | 'rejected'; created_at: string }[]  // крупные бонусы на подтверждении
-  bonusMonth: Record<number, { month: string; spent: number }>  // сколько бонуса родителя начислено ребёнку в месяце
   accepted: Record<number, boolean>    // принято ли предложение уровня
   seq: { tx: number; req: number; goal: number; task: number; user: number; acc: number; bonus: number }
 }
 
 // Бонус родителя к накоплениям: не больше 10 BYN в месяц на ребёнка (как на бэкенде)
-const BONUS_MONTH_CAP = 1000
 const BONUS_CONFIRM_DEPOSIT = 1000  // если взнос больше 10 BYN, бонус к нему подтверждает родитель
-const monthKey = () => new Date().toISOString().slice(0, 7)
 
 // Уроки финансовой грамотности: правильный ответ знает только «сервер»
 const LESSONS: (Omit<Lesson, 'completed'> & { answer: number; explanation: string })[] = [
@@ -158,7 +155,6 @@ function seed(): DB {
     lessonsDone: { 3: [1, 3] },
     accepted: {},
     bonuses: [],
-    bonusMonth: {},
     seq: { tx: 6, req: 1, goal: 1, task: 2, user: 3, acc: 11, bonus: 0 },
   }
 }
@@ -170,13 +166,6 @@ class MockError extends Error {
 
 export function mockApi(): Api {
   let db = seed()
-  // Сколько бонуса родителя ещё можно начислить ребёнку в этом месяце
-  function bonusLeft(childId: number): number {
-    const b = db.bonusMonth[childId]
-    const spent = b && b.month === monthKey() ? b.spent : 0
-    return Math.max(0, BONUS_MONTH_CAP - spent)
-  }
-
   function decideBonus(id: number, approve: boolean) {
     const m = requireParent()
     const b = db.bonuses.find((x) => x.id === id)
@@ -184,10 +173,6 @@ export function mockApi(): Api {
     if (b.status !== 'pending') throw new MockError('conflict', 'Бонус уже обработан')
     const g = db.goals.find((x) => x.id === b.goal_id)!
     b.status = approve ? 'credited' : 'rejected'
-    if (!approve) {
-      const bm = db.bonusMonth[b.child_id]
-      if (bm) bm.spent = Math.max(0, bm.spent - b.amount_cents)
-    }
     if (approve) {
       g.saved_cents += b.amount_cents
       g.bonus_cents = (g.bonus_cents ?? 0) + b.amount_cents
@@ -473,8 +458,6 @@ export function mockApi(): Api {
       access(childId)
       return delay({
         items: db.goals.filter((g) => g.child_id === childId).map(({ child_id: _c, ...g }) => g),
-        bonus_month_cap_cents: BONUS_MONTH_CAP,
-        bonus_month_left_cents: bonusLeft(childId),
       })
     },
 
@@ -485,9 +468,8 @@ export function mockApi(): Api {
       const a = card(c.id)
       if (!(amount > 0)) throw new MockError('validation_error', 'Сумма должна быть больше нуля')
       if (a.balance_cents < amount) throw new MockError('validation_error', 'На карте не хватает денег')
-      // Бонус родителя начисляется сразу: процент от взноса, но не больше остатка лимита месяца
-      const left = bonusLeft(c.id)
-      const bonus = Math.min(Math.floor((amount * g.parent_bonus_percent) / 100), left)
+      // Бонус родителя: процент от взноса, без ограничения по сумме
+      const bonus = Math.floor((amount * g.parent_bonus_percent) / 100)
       // Бонус к взносу больше 10 BYN ждёт подтверждения родителя, обычный начисляется сразу
       const needsConfirm = bonus > 0 && amount > BONUS_CONFIRM_DEPOSIT
       const credited = needsConfirm ? 0 : bonus
@@ -495,9 +477,8 @@ export function mockApi(): Api {
       g.saved_cents += amount + credited
       g.bonus_cents = (g.bonus_cents ?? 0) + credited
       if (needsConfirm) db.bonuses.push({ id: ++db.seq.bonus, child_id: c.id, goal_id: g.id, amount_cents: bonus, status: 'pending', created_at: new Date().toISOString() })
-      if (bonus > 0) db.bonusMonth[c.id] = { month: monthKey(), spent: BONUS_MONTH_CAP - left + bonus }
       if (g.saved_cents >= g.target_cents) g.status = 'done'
-      return delay({ saved_cents: g.saved_cents, card_balance_cents: a.balance_cents, bonus_cents: credited, bonus_pending_cents: needsConfirm ? bonus : 0, bonus_left_cents: left - bonus, status: g.status })
+      return delay({ saved_cents: g.saved_cents, card_balance_cents: a.balance_cents, bonus_cents: credited, bonus_pending_cents: needsConfirm ? bonus : 0, status: g.status })
     },
 
     async listPendingBonuses() {

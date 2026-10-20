@@ -344,13 +344,10 @@ export function ChildGoals({ meId }: { meId: number }) {
           {dep && dep.percent > 0 && (() => {
             // Показываем, сколько добавит родитель, ещё до нажатия кнопки
             const c = toCents(sum)
-            const left = data.bonus_month_left_cents
-            const bonus = c > 0 ? Math.min(Math.floor((c * dep.percent) / 100), left) : 0
+            const bonus = c > 0 ? Math.floor((c * dep.percent) / 100) : 0
             return (
               <Note icon="gift">
-                {left <= 0
-                  ? 'Бонус родителя в этом месяце закончился, взнос пройдёт без него'
-                  : bonus > 0 && c > 1000 ? `Взнос больше 10 BYN: бонус +${money(bonus)} добавится после подтверждения родителя`
+                {bonus > 0 && c > 1000 ? `Взнос больше 10 BYN: бонус +${money(bonus)} добавится после подтверждения родителя`
                   : bonus > 0 ? `Родитель добавит +${money(bonus)} (бонус +${dep.percent}%)` : `Родитель добавит +${dep.percent}% к каждому взносу`}
               </Note>
             )

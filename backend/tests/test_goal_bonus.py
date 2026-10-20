@@ -1,4 +1,4 @@
-"""Тесты бонуса родителя к накоплениям: начисляется сразу при взносе, с месячным лимитом."""
+"""Тесты бонуса родителя к накоплениям: начисляется сразу при взносе, без лимита по сумме; к взносу больше 10 BYN нужно подтверждение родителя."""
 import pytest
 from httpx import AsyncClient
 
@@ -26,7 +26,6 @@ async def test_deposit_adds_parent_bonus(client: AsyncClient, seed_test_data):
     assert body["bonus_cents"] == 100                # 10% от 10 BYN
     assert body["saved_cents"] == 1100               # взнос + бонус
     assert body["card_balance_cents"] == 250         # с карты списан только взнос
-    assert body["bonus_left_cents"] == 900           # 10 BYN лимит минус 1 BYN бонуса
 
 
 @pytest.mark.asyncio
@@ -41,31 +40,30 @@ async def test_no_bonus_when_percent_is_zero(client: AsyncClient, seed_test_data
 
 
 @pytest.mark.asyncio
-async def test_big_bonus_waits_for_parent_and_month_limit_holds(client: AsyncClient, seed_test_data):
+async def test_big_deposit_bonus_waits_for_parent_and_has_no_cap(client: AsyncClient, seed_test_data):
     goal_id = await _goal_with_bonus(client, 100)
 
     first = await client.post(f"/goals/{goal_id}/deposit", json={"amount_cents": 1250}, headers=CHILD)
     body = first.json()
     assert body["bonus_cents"] == 0                  # взнос больше 10 BYN — бонус только после подтверждения
-    assert body["bonus_pending_cents"] == 1000       # 100% от 12,50 BYN, но не больше лимита 10 BYN
+    assert body["bonus_pending_cents"] == 1250       # 100% от 12,50 BYN — без верхнего лимита
     assert body["saved_cents"] == 1250
-    assert body["bonus_left_cents"] == 0
 
     pending = (await client.get("/bonuses/pending", headers=PARENT)).json()["items"]
-    assert len(pending) == 1 and pending[0]["amount_cents"] == 1000
+    assert len(pending) == 1 and pending[0]["amount_cents"] == 1250
     bonus_id = pending[0]["id"]
 
     # ребёнок не может подтверждать сам
     assert (await client.post(f"/bonuses/{bonus_id}/approve", headers=CHILD)).status_code == 403
 
     ok = await client.post(f"/bonuses/{bonus_id}/approve", headers=PARENT)
-    assert ok.json()["status"] == "credited" and ok.json()["saved_cents"] == 2250
+    assert ok.json()["status"] == "credited" and ok.json()["saved_cents"] == 2500
     assert (await client.post(f"/bonuses/{bonus_id}/approve", headers=PARENT)).status_code == 409
 
     await client.post("/children/2/topup", json={"amount_cents": 5000}, headers=PARENT)
     second = await client.post(f"/goals/{goal_id}/deposit", json={"amount_cents": 500}, headers=CHILD)
-    assert second.json()["bonus_cents"] == 0         # лимит месяца исчерпан
-    assert second.json()["saved_cents"] == 2250 + 500
+    assert second.json()["bonus_cents"] == 500       # лимита нет: 100% от 5 BYN (взнос до 10 BYN — сразу)
+    assert second.json()["saved_cents"] == 2500 + 500 + 500
 
 
 @pytest.mark.asyncio
@@ -80,7 +78,7 @@ async def test_rejected_big_bonus_is_not_credited(client: AsyncClient, seed_test
 
 
 @pytest.mark.asyncio
-async def test_goals_list_shows_bonus_and_month_left(client: AsyncClient, seed_test_data):
+async def test_goals_list_shows_bonus(client: AsyncClient, seed_test_data):
     goal_id = await _goal_with_bonus(client, 10)
     await client.post(f"/goals/{goal_id}/deposit", json={"amount_cents": 1000}, headers=CHILD)
 
@@ -89,8 +87,6 @@ async def test_goals_list_shows_bonus_and_month_left(client: AsyncClient, seed_t
     assert r.status_code == 200
     body = r.json()
     assert body["items"][0]["bonus_cents"] == 100
-    assert body["bonus_month_cap_cents"] == 1000
-    assert body["bonus_month_left_cents"] == 900
 
 
 @pytest.mark.asyncio
