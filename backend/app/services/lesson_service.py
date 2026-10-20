@@ -11,8 +11,17 @@ from app.schemas.lesson import (
     AnswerLessonResponse,
     LessonItem,
     LessonsListResponse,
+    LessonVideo,
 )
 from app.services.user_service import UserService
+
+# Обучающие видео (созданы ИИ) лежат во фронтенде, в public/videos.
+# Пока файла нет, фронтенд показывает заглушку.
+LESSON_VIDEOS = {
+    2: LessonVideo(url="/videos/lesson-2-saving.mp4", seconds=45, captions="Цель — это сумма и срок. Откладывай каждую неделю одну и ту же сумму, и мечта станет ближе."),
+    3: LessonVideo(url="/videos/lesson-3-scam.mp4", seconds=50, captions="Банк никогда не просит код из СМС. Если просят — это мошенники: ничего не отвечай и покажи сообщение родителю."),
+    5: LessonVideo(url="/videos/lesson-5-no-money.mp4", seconds=40, captions="Не хватило денег или лимита — это нормально. Подожди до завтра или вежливо попроси родителя в приложении."),
+}
 
 WRONG_EXPLANATION = "Не совсем. Перечитай урок и попробуй ещё раз."
 
@@ -44,6 +53,7 @@ class LessonService:
             items=[
                 LessonItem(
                     id=lesson.id,
+                    video=LESSON_VIDEOS.get(lesson.id),
                     title=lesson.title,
                     description=lesson.description or "",
                     content=list(lesson.content or []),

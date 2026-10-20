@@ -105,3 +105,29 @@ async def test_parent_cannot_answer_lesson(client: AsyncClient, seed_test_data, 
         json={"option_index": 1},
     )
     assert response.status_code == 403
+
+
+@pytest.mark.asyncio
+async def test_lesson_with_video_returns_video_info(client: AsyncClient, seed_test_data, db_session):
+    db_session.add(
+        Lesson(
+            id=2,
+            title="Как копить на цель",
+            description="Считаем недели",
+            content=["Цель — это сумма и срок."],
+            question="Сколько недель?",
+            options=["10", "30", "300"],
+            answer_index=1,
+            explanation="300 ÷ 10 = 30.",
+            xp_reward=20,
+            points_reward=50,
+        )
+    )
+    await db_session.commit()
+    child_id = seed_test_data["family1_child_id"]
+
+    response = await client.get("/lessons", headers={"X-User-Id": str(child_id)})
+    assert response.status_code == 200
+    item = response.json()["items"][0]
+    assert item["video"]["url"] == "/videos/lesson-2-saving.mp4"
+    assert item["video"]["seconds"] == 45

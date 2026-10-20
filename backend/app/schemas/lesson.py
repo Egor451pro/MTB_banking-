@@ -1,11 +1,18 @@
 """Схемы уроков финансовой грамотности."""
-from typing import List
+from typing import List, Optional
 
 from pydantic import BaseModel, Field
 
 
+class LessonVideo(BaseModel):
+    url: str
+    seconds: int
+    captions: str
+
+
 class LessonItem(BaseModel):
     id: int
+    video: Optional[LessonVideo] = None
     title: str
     description: str
     content: List[str]
