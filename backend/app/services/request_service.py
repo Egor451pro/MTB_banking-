@@ -2,7 +2,7 @@
 from datetime import datetime
 
 from fastapi import HTTPException
-from sqlalchemy import Select, select
+from sqlalchemy import Select, delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models import (
@@ -127,13 +127,7 @@ class RequestService:
                     detail={"error": "forbidden", "message": "Категорию 18+ нельзя открыть: она запрещена банком"},
                 )
             await db.execute(
-                select(Limit).where(
-                    Limit.child_id == child.id,
-                    Limit.category == req.category,
-                )
-            )
-            await db.execute(
-                Limit.__table__.delete().where(
+                delete(Limit).where(
                     Limit.child_id == child.id,
                     Limit.category == req.category,
                 )
