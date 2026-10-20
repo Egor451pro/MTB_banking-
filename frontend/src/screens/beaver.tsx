@@ -39,7 +39,10 @@ function levelFor(built: number) {
 
 const logWord = (n: number) => plural(n, 'бревно', 'бревна', 'брёвен')
 
-export function BeaverScreen({ meId }: { meId: number }) {
+export function BeaverScreen({ meId, ageGroup }: { meId: number; ageGroup: string }) {
+  const teen = ageGroup === '14-17'
+  const sprite = teen ? '/beaver/teen.png' : '/beaver/kid.png'
+  const spriteUp = teen ? '/beaver/teen.png' : '/beaver/kid-wave.png'
   const goals = useData(() => api.getGoals(meId), [meId], 3000)
   const tasks = useData(() => api.listTasks(), [], 3000)
   const lessons = useData(() => api.getLessons(), [], 3000)
@@ -95,8 +98,8 @@ export function BeaverScreen({ meId }: { meId: number }) {
             />
           ))}
           <img
-            src="/beaver/kid.png" alt="Бобёр" draggable={false}
-            className="anim-bob absolute bottom-1 left-2 h-[62%] select-none drop-shadow-[0_6px_6px_rgba(0,0,0,0.18)]"
+            src={sprite} alt="Бобёр" draggable={false}
+            className="anim-bob absolute bottom-1 left-2 h-[68%] select-none drop-shadow-[0_6px_6px_rgba(0,0,0,0.18)]"
           />
           <div className="absolute left-3 top-3 rounded-full bg-white/90 px-3 py-1.5 text-xs font-bold text-[#2334C8]">
             Уровень {level.n} · {level.title}
@@ -137,7 +140,7 @@ export function BeaverScreen({ meId }: { meId: number }) {
             <div className="text-lg font-semibold text-mt-ink">{upLevel.title}</div>
             <div className="relative mx-auto aspect-[4/3] w-full overflow-hidden rounded-[22px]">
               <img src={`/beaver/dam${upLevel.n}.jpg`} alt="" className="h-full w-full object-cover" />
-              <img src="/beaver/kid.png" alt="" className="anim-bob absolute bottom-1 left-2 h-[62%]" />
+              <img src={spriteUp} alt="" className="anim-bob absolute bottom-1 left-2 h-[68%]" />
             </div>
             <div className="text-sm text-muted">Плотина стала крепче. Копишь — растёшь!</div>
             <Btn onClick={() => setLevelUp(null)}>Отлично!</Btn>

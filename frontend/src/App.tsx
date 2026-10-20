@@ -63,7 +63,7 @@ function ChildShell({ me }: { me: Me }) {
   else if (top?.name === 'loyalty') body = <LoyaltyScreen onBack={back} />
   else if (tab === 'pay') body = <ChildPay meId={me.id} />
   else if (tab === 'goals') body = <ChildGoals meId={me.id} />
-  else if (tab === 'pet') body = <BeaverScreen meId={me.id} />
+  else if (tab === 'pet') body = <BeaverScreen meId={me.id} ageGroup={me.age_group} />
   else if (tab === 'tasks') body = <ChildTasks />
   else if (tab === 'level') body = <ChildLevel meId={me.id} />
   else body = <ChildHome meId={me.id} />
