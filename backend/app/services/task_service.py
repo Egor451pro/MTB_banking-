@@ -79,6 +79,11 @@ class TaskService:
         task = result.scalar_one_or_none()
         if task is None:
             raise HTTPException(status_code=404, detail={"error": "not_found", "message": "Задание не найдено"})
+        if task.status != TaskStatus.NEW:
+            raise HTTPException(
+                status_code=409,
+                detail={"error": "conflict", "message": "Задание уже отправлено или проверено"},
+            )
         task.status = TaskStatus.DONE
         await db.flush()
         return TaskStatusResponse(id=task.id, status=task.status.value)
@@ -118,6 +123,11 @@ class TaskService:
     @staticmethod
     async def reject(parent: User, task_id: int, db: AsyncSession) -> TaskStatusResponse:
         task, _ = await TaskService._get_parent_scoped_task(parent, task_id, db)
+        if task.status != TaskStatus.DONE:
+            raise HTTPException(
+                status_code=409,
+                detail={"error": "conflict", "message": "Задание ещё не выполнено"},
+            )
         task.status = TaskStatus.REJECTED
         await db.flush()
         return TaskStatusResponse(id=task.id, status=task.status.value)
