@@ -170,17 +170,9 @@ export interface Allowance {
   next_date: string | null // YYYY-MM-DD
 }
 
-// Короткое обучающее видео (создано ИИ), лежит в public/videos
-export interface LessonVideo {
-  url: string
-  seconds: number
-  captions: string   // краткий текст для тех, кто смотрит без звука
-}
-
 // Урок финансовой грамотности
 export interface Lesson {
   id: number
-  video?: LessonVideo | null
   title: string
   description: string
   content: string[]

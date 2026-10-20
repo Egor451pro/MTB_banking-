@@ -396,7 +396,3 @@ Parent видит задания своих детей, child только св�
   Нет обязательного согласия → 422. `online_payments` для 7–13 → 422.
 - Права: `online_payments` и `virtual_card` для 7–13 лет закрыты (`locked_reason: "Доступно с 14 лет"`).
 - `partner_offers` у нового ребёнка по умолчанию выключено — включает родитель.
-
-## Видео в уроках
-
-`GET /lessons`: у урока может быть поле `video: {url, seconds, captions} | null`. Файлы лежат во фронтенде в `public/videos/`, бэкенд отдаёт только описание (`LESSON_VIDEOS` в `lesson_service.py`). Урок 5 «Деньги закончились» добавлен в seed.

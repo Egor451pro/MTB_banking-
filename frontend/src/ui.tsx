@@ -170,7 +170,8 @@ export function Toggle({ on, onChange, disabled }: { on: boolean; onChange: (v: 
     <button
       disabled={disabled}
       onClick={() => onChange(!on)}
-      aria-pressed={on}
+      role="switch"
+      aria-checked={on}
       className={`relative h-[30px] w-[50px] shrink-0 rounded-full transition disabled:opacity-40 ${on ? 'bg-[#2F6FE4]' : 'bg-[#D3D8E0]'}`}
     >
       <span className={`absolute top-[2px] h-[26px] w-[26px] rounded-full bg-white shadow transition-all ${on ? 'left-[22px]' : 'left-[2px]'}`} />
