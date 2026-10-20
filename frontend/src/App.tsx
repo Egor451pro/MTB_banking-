@@ -5,6 +5,7 @@ import { BonusBannerHost, BottomNav, ToastHost, Loading, type TabDef } from './u
 import { useData } from './hooks'
 import type { Me } from './types'
 import { ChildGoals, ChildHome, ChildLevel, ChildPay, ChildTasks, LessonScreen, RequestScreen } from './screens/child'
+import { BeaverScreen } from './screens/beaver'
 import { LoyaltyScreen } from './screens/shared'
 import { ChildManage, PackageFlow, ParentHome, ParentProducts, ParentRequests, ParentTasks } from './screens/parent'
 import { LoginScreen } from './screens/auth'
@@ -51,6 +52,7 @@ function ChildShell({ me }: { me: Me }) {
     { id: 'home', label: 'Главная', icon: 'home' },
     { id: 'pay', label: 'Оплата', icon: 'card' },
     { id: 'goals', label: 'Цели', icon: 'target' },
+    { id: 'pet', label: 'Бобёр', icon: 'heart' },
     { id: 'tasks', label: 'Задания', icon: 'tasks' },
     { id: 'level', label: 'Награды', icon: 'star' },
   ]
@@ -61,6 +63,7 @@ function ChildShell({ me }: { me: Me }) {
   else if (top?.name === 'loyalty') body = <LoyaltyScreen onBack={back} />
   else if (tab === 'pay') body = <ChildPay meId={me.id} />
   else if (tab === 'goals') body = <ChildGoals meId={me.id} />
+  else if (tab === 'pet') body = <BeaverScreen meId={me.id} />
   else if (tab === 'tasks') body = <ChildTasks />
   else if (tab === 'level') body = <ChildLevel meId={me.id} />
   else body = <ChildHome meId={me.id} />
