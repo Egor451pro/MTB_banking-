@@ -62,8 +62,8 @@ export function BeaverScreen({ meId, ageGroup }: { meId: number; ageGroup: strin
   const teen = ageGroup === '14-17'
   const sprite = teen ? '/beaver/teen.png' : '/beaver/kid.png'
   const spriteUp = teen ? '/beaver/teen.png' : '/beaver/kid-wave.png'
-  // «Рабочая форма» строителя (каска). Пока картинки нет, onError возвращает обычный спрайт
-  const spriteBuilder = teen ? '/beaver/teen-builder.png' : '/beaver/kid-builder.png'
+  // «Рабочая форма» строителя (каска, жилет, молоток), одна на все возрасты. Если файла нет, onError возвращает обычный спрайт
+  const spriteBuilder = '/beaver/builder.png'
 
   const goals = useData(() => api.getGoals(meId), [meId], 3000)
   const tasks = useData(() => api.listTasks(), [], 3000)
