@@ -3,6 +3,7 @@ import { api, session } from '../api'
 import { CATEGORY_ICON, CATEGORY_LABEL, PERMISSION_INFO, dateShort, money, toCents } from '../format'
 import { useData } from '../hooks'
 import { Icon, type IconName } from '../icons'
+import { ExplainerPlayer, hasExplainer } from '../explainers'
 import { useNav } from '../nav'
 import {
   Avatar, BalanceCard, Badge, Btn, Card, Empty, Field, Header, IconTile, Loading, Note, Progress,
@@ -12,11 +13,13 @@ import type { Category, DeclineReason, Lesson, LessonResult, LessonVideo, PayRes
 import { GoalCard, LevelRing, REQ_ICON, TaskHead, TxList, requestText } from './shared'
 
 // Видео-урок. Если файла нет или он не грузится — показываем заглушку с текстом.
-function VideoPlayer({ v }: { v: LessonVideo }) {
+function VideoPlayer({ v, lessonId }: { v: LessonVideo; lessonId: number }) {
   const [failed, setFailed] = useState(false)
   return (
     <div className="overflow-hidden rounded-[20px] bg-white">
-      {failed ? (
+      {failed && hasExplainer(lessonId) ? (
+        <ExplainerPlayer lessonId={lessonId} />
+      ) : failed ? (
         <div className="flex aspect-video flex-col items-center justify-center gap-2 bg-gradient-to-br from-[#2B5FDB] to-[#6AA6F3] px-6 text-center text-white">
           <Icon name="play" size={36} />
           <div className="text-sm font-semibold">Видео скоро появится</div>
@@ -489,7 +492,7 @@ export function LessonScreen({ id }: { id: number }) {
     <>
       <Header title={lesson.title} subtitle={lesson.description} onBack={back} />
       <div className="space-y-4 p-4">
-        {lesson.video && <VideoPlayer v={lesson.video} />}
+        {lesson.video && <VideoPlayer v={lesson.video} lessonId={lesson.id} />}
         <Card className="space-y-3">
           {lesson.content.map((p, i) => <p key={i} className="text-[15px] leading-relaxed text-mt-ink">{p}</p>)}
         </Card>
