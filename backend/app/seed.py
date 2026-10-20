@@ -4,9 +4,17 @@
 Поддерживает повторный запуск (очищает данные перед заполнением).
 """
 import asyncio
+import sys
 from datetime import datetime, timedelta, date
 from sqlalchemy import delete
 import pytz
+
+def _log(msg: str) -> None:
+    try:
+        print(msg)
+    except UnicodeEncodeError:
+        encoding = getattr(sys.stdout, "encoding", None) or "cp1251"
+        print(msg.encode(encoding, errors="replace").decode(encoding, errors="replace"))
 
 from app.db import AsyncSessionLocal, Base, engine
 from app.models import (
@@ -19,7 +27,7 @@ from app.models import (
 
 async def clear_all_tables(session):
     """Очищает все таблицы перед заполнением"""
-    print("🗑️  Очистка таблиц...")
+    _log("Очистка таблиц...")
     
     # Порядок важен из-за внешних ключей
     await session.execute(delete(LessonProgress))
@@ -36,12 +44,12 @@ async def clear_all_tables(session):
     await session.execute(delete(Family))
     
     await session.commit()
-    print("✅ Таблицы очищены")
+    _log("Таблицы очищены")
 
 
 async def seed_data():
     """Наполняет БД демо-данными"""
-    print("🌱 Начинаем заполнение базы данных...")
+    _log("Начинаем заполнение базы данных...")
     
     # Пересоздаём схему: seed полностью заменяет данные, так подхватываются новые колонки.
     async with engine.begin() as conn:
@@ -53,7 +61,7 @@ async def seed_data():
         await clear_all_tables(session)
         
         # 1. Создаем семью
-        print("👨‍👩‍👧‍👦 Создаем семью...")
+        _log("Создаем семью...")
         family = Family(
             id=1,
             name="Семья Ивановых",
@@ -63,7 +71,7 @@ async def seed_data():
         await session.flush()
         
         # 2. Создаем пользователей
-        print("👤 Создаем пользователей...")
+        _log("Создаем пользователей...")
         
         # Мама (parent, id=1)
         mama = User(
@@ -107,7 +115,7 @@ async def seed_data():
         await session.flush()
         
         # 3. Создаем согласия (consents)
-        print("📝 Создаем согласия...")
+        _log("Создаем согласия...")
         
         # Для Миши (7-13 лет) — без онлайн-платежей; права: goals, partner_offers
         session.add(Consent(child_id=misha.id, consent_type="card_issue"))
@@ -127,12 +135,12 @@ async def seed_data():
         session.add(Consent(child_id=anya.id, consent_type="partner_offers"))
         
         # 3b. Карманные деньги: Миша 10 BYN/неделя, Аня 20 BYN/неделя
-        print("🪙 Создаём карманные деньги...")
+        _log("Создаём карманные деньги...")
         session.add(Allowance(child_id=misha.id, amount_cents=1000, period="week", active=True))
         session.add(Allowance(child_id=anya.id, amount_cents=2000, period="week", active=True))
 
         # 4. Создаем карты
-        print("💳 Создаем карты...")
+        _log("Создаем карты...")
         
         misha_card = Account(
             id=10,
@@ -159,7 +167,7 @@ async def seed_data():
         await session.flush()
         
         # 5. Создаем лимиты
-        print("🚦 Создаем лимиты...")
+        _log("Создаем лимиты...")
         
         # Лимиты для Миши
         session.add(Limit(
@@ -201,7 +209,7 @@ async def seed_data():
         ))
         
         # 6. Создаем транзакции
-        print("💸 Создаем транзакции...")
+        _log("Создаем транзакции...")
         
         minsk_tz = pytz.timezone("Europe/Minsk")
         now = datetime.now(minsk_tz)
@@ -340,7 +348,7 @@ async def seed_data():
             session.add(tx)
         
         # 7. Создаем цели (goals)
-        print("🎯 Создаем цели...")
+        _log("Создаем цели...")
         
         session.add(Goal(
             child_id=misha.id,
@@ -352,7 +360,7 @@ async def seed_data():
         ))
         
         # 8. Создаем задания (tasks)
-        print("✅ Создаем задания...")
+        _log("Создаем задания...")
         
         session.add(Task(
             assigned_to=misha.id,
@@ -373,7 +381,7 @@ async def seed_data():
         ))
         
         # 9. Создаем запросы (access_requests)
-        print("🙋 Создаем запросы...")
+        _log("Создаем запросы...")
         
         session.add(AccessRequest(
             child_id=misha.id,
@@ -386,7 +394,7 @@ async def seed_data():
         ))
 
         # 10. Уроки финансовой грамотности (как LESSONS в mock.ts)
-        print("📚 Создаём уроки...")
+        _log("Создаём уроки...")
         lessons = [
             Lesson(
                 id=1,
@@ -458,17 +466,17 @@ async def seed_data():
         # Коммитим все изменения
         await session.commit()
         
-        print("✅ База данных успешно заполнена!")
-        print("\n📊 Созданные данные:")
-        print(f"   - Семья: {family.name}")
-        print(f"   - Пользователи: Мама (id=1), Миша (id=2), Аня (id=3)")
-        print(f"   - Карты: 2 шт")
-        print(f"   - Лимиты: 5 шт")
-        print(f"   - Транзакции: {len(transactions_misha) + len(transactions_anya)} шт")
-        print(f"   - Цели: 1 шт")
-        print(f"   - Задания: 2 шт")
-        print(f"   - Запросы: 1 шт")
-        print(f"   - Уроки: {len(lessons)} шт")
+        _log("База данных успешно заполнена!")
+        _log("\nСозданные данные:")
+        _log(f"   - Семья: {family.name}")
+        _log(f"   - Пользователи: Мама (id=1), Миша (id=2), Аня (id=3)")
+        _log(f"   - Карты: 2 шт")
+        _log(f"   - Лимиты: 5 шт")
+        _log(f"   - Транзакции: {len(transactions_misha) + len(transactions_anya)} шт")
+        _log(f"   - Цели: 1 шт")
+        _log(f"   - Задания: 2 шт")
+        _log(f"   - Запросы: 1 шт")
+        _log(f"   - Уроки: {len(lessons)} шт")
 
 
 if __name__ == "__main__":
