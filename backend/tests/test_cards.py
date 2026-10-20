@@ -57,6 +57,37 @@ async def test_block_and_unblock_card(client: AsyncClient, seed_test_data):
 
 
 @pytest.mark.asyncio
+async def test_reissue_card_keeps_balance_and_activates(client: AsyncClient, seed_test_data):
+    data = seed_test_data
+    parent_id = data["family1_parent_id"]
+
+    await client.post("/cards/10/block", headers={"X-User-Id": str(parent_id)})
+    response = await client.post("/cards/10/reissue", headers={"X-User-Id": str(parent_id)})
+    assert response.status_code == 200
+    body = response.json()
+    assert body["id"] == 10
+    assert body["status"] == "active"
+    assert body["last4"] != "4412"
+    assert len(body["last4"]) == 4
+
+    profile = await client.get(
+        f"/children/{data['family1_child_id']}",
+        headers={"X-User-Id": str(parent_id)},
+    )
+    assert profile.json()["card"]["balance_cents"] == 1250
+    assert profile.json()["card"]["last4"] == body["last4"]
+    assert profile.json()["card"]["status"] == "active"
+
+
+@pytest.mark.asyncio
+async def test_reissue_other_family_card_forbidden(client: AsyncClient, seed_test_data):
+    data = seed_test_data
+    response = await client.post("/cards/11/reissue", headers={"X-User-Id": str(data["family1_parent_id"])})
+    assert response.status_code == 403
+    assert response.json()["error"] == "forbidden"
+
+
+@pytest.mark.asyncio
 async def test_block_other_family_card_forbidden(client: AsyncClient, seed_test_data):
     data = seed_test_data
     parent_id = data["family1_parent_id"]

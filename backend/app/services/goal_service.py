@@ -52,6 +52,14 @@ class GoalService:
         Создать новую цель (ребенок).
         POST /goals
         """
+        from app.services.permission_service import PermissionService
+
+        if not await PermissionService.is_enabled(db, child, "goals"):
+            raise HTTPException(
+                status_code=403,
+                detail={"error": "forbidden", "message": "Цели выключены родителем — попроси доступ"},
+            )
+
         if not title.strip():
             raise HTTPException(
                 status_code=422,

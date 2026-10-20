@@ -68,3 +68,9 @@ class TopupResponse(BaseModel):
 class CardStatusResponse(BaseModel):
     id: int
     status: Literal["active", "blocked"]
+
+
+class CardReissueResponse(BaseModel):
+    id: int
+    last4: str
+    status: Literal["active", "blocked"]

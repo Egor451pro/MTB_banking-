@@ -3,7 +3,7 @@ SQLAlchemy модели для всех таблиц.
 Важно: деньги хранятся как Integer в копейках с суффиксом _cents.
 Возраст не хранится, только birth_date.
 """
-from sqlalchemy import Integer, String, ForeignKey, DateTime, Boolean, Date, Text, Enum
+from sqlalchemy import Integer, String, ForeignKey, DateTime, Boolean, Date, Text, Enum, JSON
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from datetime import datetime, date
 from typing import Optional, List
@@ -55,6 +55,7 @@ class RequestType(str, enum.Enum):
     MONEY = "money"
     LIMIT_INCREASE = "limit_increase"
     CATEGORY_UNLOCK = "category_unlock"
+    PRODUCT_ACCESS = "product_access"
 
 
 class RequestStatus(str, enum.Enum):
@@ -219,6 +220,7 @@ class AccessRequest(Base):
     type: Mapped[RequestType] = mapped_column(Enum(RequestType), nullable=False)
     amount_cents: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)  # Для money и limit_increase
     category: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)  # Для category_unlock
+    permission: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)  # Для product_access
     comment: Mapped[str] = mapped_column(Text, default="")
     status: Mapped[RequestStatus] = mapped_column(Enum(RequestStatus), default=RequestStatus.PENDING)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
@@ -228,6 +230,17 @@ class AccessRequest(Base):
     child: Mapped["User"] = relationship("User", back_populates="access_requests")
 
 
+class Allowance(Base):
+    """Карманные деньги ребёнка"""
+    __tablename__ = "allowances"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    child_id: Mapped[int] = mapped_column(ForeignKey("users.id"), unique=True, nullable=False)
+    amount_cents: Mapped[int] = mapped_column(Integer, default=0)
+    period: Mapped[str] = mapped_column(String(10), default="week")  # day | week
+    active: Mapped[bool] = mapped_column(Boolean, default=False)
+
+
 class Lesson(Base):
     """Урок финансовой грамотности"""
     __tablename__ = "lessons"
@@ -235,9 +248,14 @@ class Lesson(Base):
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     title: Mapped[str] = mapped_column(String(255), nullable=False)
     description: Mapped[str] = mapped_column(Text, nullable=True)
-    content: Mapped[str] = mapped_column(Text, nullable=False)  # Markdown или HTML
-    min_level: Mapped[int] = mapped_column(Integer, default=1)  # Минимальный уровень для доступа
+    content: Mapped[list] = mapped_column(JSON, nullable=False)  # список абзацев
+    question: Mapped[str] = mapped_column(Text, nullable=False)
+    options: Mapped[list] = mapped_column(JSON, nullable=False)
+    answer_index: Mapped[int] = mapped_column(Integer, nullable=False)
+    explanation: Mapped[str] = mapped_column(Text, nullable=False)
+    min_level: Mapped[int] = mapped_column(Integer, default=1)
     xp_reward: Mapped[int] = mapped_column(Integer, default=0)
+    points_reward: Mapped[int] = mapped_column(Integer, default=0)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
 
     # Relationships

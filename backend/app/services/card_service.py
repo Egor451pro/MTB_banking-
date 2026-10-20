@@ -1,4 +1,6 @@
-"""Бизнес-логика карты: пополнение, блок, разблок."""
+"""Бизнес-логика карты: пополнение, блок, разблок, перевыпуск."""
+import random
+
 from fastapi import HTTPException
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -12,7 +14,7 @@ from app.models import (
     TransactionStatus,
     User,
 )
-from app.schemas.user import CardStatusResponse, TopupResponse
+from app.schemas.user import CardReissueResponse, CardStatusResponse, TopupResponse
 
 
 class CardService:
@@ -50,3 +52,20 @@ class CardService:
         account.status = status
         await db.flush()
         return CardStatusResponse(id=account.id, status=account.status.value)
+
+    @staticmethod
+    async def reissue(parent: User, card_id: int, db: AsyncSession) -> CardReissueResponse:
+        result = await db.execute(select(Account).where(Account.id == card_id))
+        account = result.scalar_one_or_none()
+        if account is None:
+            raise HTTPException(status_code=404, detail={"error": "not_found", "message": "Карта не найдена"})
+
+        await check_family_access(account.owner_id, parent, db)
+        account.card_last4 = f"{random.randint(1000, 9999)}"
+        account.status = AccountStatus.ACTIVE
+        await db.flush()
+        return CardReissueResponse(
+            id=account.id,
+            last4=account.card_last4,
+            status=account.status.value,
+        )

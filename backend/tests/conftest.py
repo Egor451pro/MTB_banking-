@@ -8,7 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_asyn
 
 from app.db import Base, get_db
 from app.main import app
-from app.models import Account, AccountStatus, AccountType, Family, User, UserRole
+from app.models import Account, AccountStatus, AccountType, Consent, Family, User, UserRole
 
 TEST_DATABASE_URL = "sqlite+aiosqlite:///./test.db"
 
@@ -104,6 +104,10 @@ async def seed_test_data(prepare_db: None) -> dict[str, int]:
             )
         )
         await session.flush()
+
+        # По умолчанию цели включены (как при оформлении пакета)
+        session.add(Consent(child_id=2, consent_type="goals"))
+        session.add(Consent(child_id=4, consent_type="goals"))
 
         session.add(
             Account(

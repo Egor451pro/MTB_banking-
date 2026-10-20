@@ -128,6 +128,20 @@ class FamilyService:
         if not child_name:
             raise HTTPException(status_code=422, detail={"error": "validation_error", "message": "Укажите имя ребёнка"})
 
+        required = ["card_issue", "moby_access", "personal_data"]
+        if child_age >= 14:
+            required.append("teen_info_sharing")
+        if any(item not in request.consents for item in required):
+            raise HTTPException(
+                status_code=422,
+                detail={"error": "validation_error", "message": "Не все обязательные согласия получены"},
+            )
+        if child_age < 14 and "online_payments" in request.consents:
+            raise HTTPException(
+                status_code=422,
+                detail={"error": "validation_error", "message": "Онлайн-платежи доступны с 14 лет"},
+            )
+
         child = User(
             family_id=parent.family_id,
             role=UserRole.CHILD,
@@ -170,14 +184,13 @@ class FamilyService:
             )
         )
 
-        if child_age < 14 and "online_payments" in request.consents:
-            raise HTTPException(
-                status_code=422,
-                detail={"error": "validation_error", "message": "Онлайн-платежи доступны только для 14-17 лет"},
-            )
-
         for consent in request.consents:
             db.add(Consent(child_id=child.id, consent_type=consent))
+        await db.flush()
+
+        from app.services.permission_service import PermissionService
+
+        await PermissionService.grant_defaults(db, child)
 
         await db.flush()
         return CreatePackageResponse(

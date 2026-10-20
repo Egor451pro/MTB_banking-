@@ -7,6 +7,8 @@ from .request import router as request_router
 from .task import router as task_router
 from .transaction import router as transaction_router
 from .demo import router as demo_router
+from .lesson import router as lesson_router
+from .loyalty import router as loyalty_router
 
 __all__ = [
     "user_router",
@@ -18,4 +20,6 @@ __all__ = [
     "task_router",
     "transaction_router",
     "demo_router",
+    "lesson_router",
+    "loyalty_router",
 ]
