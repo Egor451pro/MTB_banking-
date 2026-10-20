@@ -1,0 +1,14 @@
+
+/* Бобёр: полёт бревна, всплывающее +1, конфетти */
+@keyframes log-fly-x { from { transform: translateX(0) } to { transform: translateX(var(--dx)) } }
+@keyframes log-fly-y {
+  0%   { transform: translateY(0) rotate(-20deg) }
+  45%  { transform: translateY(-96px) rotate(160deg) }
+  100% { transform: translateY(var(--dy)) rotate(340deg) }
+}
+.log-fly-x { animation: log-fly-x 0.56s linear both; }
+.log-fly-y { animation: log-fly-y 0.56s cubic-bezier(.3,.1,.6,1) both; }
+@keyframes pop-up { 0% { opacity: 0; transform: translateY(6px) scale(.8) } 25% { opacity: 1; transform: translateY(-6px) scale(1.1) } 100% { opacity: 0; transform: translateY(-34px) scale(1) } }
+.anim-pop { animation: pop-up .9s ease-out both; }
+@keyframes confetti-fall { 0% { opacity: 1; transform: translateY(0) rotate(0) } 100% { opacity: 0; transform: translateY(300px) rotate(540deg) } }
+.anim-confetti { animation: confetti-fall 1.6s ease-in both; }
