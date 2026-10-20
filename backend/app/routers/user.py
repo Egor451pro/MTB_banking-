@@ -11,6 +11,7 @@ from app.models import AccountStatus, User
 from app.schemas.allowance import AllowanceResponse, PayAllowanceResponse, PutAllowanceRequest
 from app.schemas.permission import PermissionsListResponse, PutPermissionsRequest
 from app.schemas.user import (
+    CardReissueResponse,
     CardStatusResponse,
     ChildProfileResponse,
     MeResponse,
@@ -84,6 +85,15 @@ async def unblock_card(
 ):
     """POST /cards/{id}/unblock — разблокировать карту. Только родитель своей семьи."""
     return await CardService.set_status(parent=parent, card_id=card_id, status=AccountStatus.ACTIVE, db=db)
+
+
+@router.post("/cards/{card_id}/reissue", response_model=CardReissueResponse)
+async def reissue_card(
+    card_id: int,
+    parent: Annotated[User, Depends(require_parent)],
+    db: AsyncSession = Depends(get_db),
+):
+    return await CardService.reissue(parent=parent, card_id=card_id, db=db)
 
 
 @router.get("/children/{child_id}/permissions", response_model=PermissionsListResponse)
