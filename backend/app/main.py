@@ -16,6 +16,7 @@ from app.routers import (
     demo_router,
     family_router,
     lesson_router,
+    loyalty_router,
     goal_router,
     limit_router,
     payment_router,
@@ -73,6 +74,7 @@ app.include_router(task_router, tags=["Tasks"])
 app.include_router(transaction_router, tags=["Transactions"])
 app.include_router(demo_router, tags=["Demo"])
 app.include_router(lesson_router, tags=["Lessons"])
+app.include_router(loyalty_router, tags=["Loyalty"])
 
 
 @app.exception_handler(HTTPException)

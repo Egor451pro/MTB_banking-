@@ -74,7 +74,7 @@ async def seed_data():
             birth_date=date(1988, 4, 10),
             xp=0,
             level=1,
-            points=0
+            points=1250
         )
         session.add(mama)
         
@@ -87,7 +87,7 @@ async def seed_data():
             birth_date=date(2016, 3, 2),
             xp=100,
             level=2,
-            points=0
+            points=340
         )
         session.add(misha)
         
@@ -100,7 +100,7 @@ async def seed_data():
             birth_date=date(2011, 6, 20),
             xp=260,
             level=3,
-            points=0
+            points=820
         )
         session.add(anya)
         

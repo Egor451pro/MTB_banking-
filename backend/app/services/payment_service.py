@@ -184,6 +184,9 @@ class PaymentService:
 
         # 7) approved
         account.balance_cents -= request.amount_cents
+        from app.services.loyalty_service import cashback_points
+
+        child.points += cashback_points(request.category, request.amount_cents)
         return await PaymentService._save_and_response(
             db=db,
             account=account,

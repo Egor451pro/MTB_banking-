@@ -153,8 +153,9 @@ class TransactionService:
 
     @staticmethod
     async def _award_cashback(child: User, tx: Transaction, db: AsyncSession) -> None:
-        # Кешбэк подключается вместе с программой лояльности.
-        return None
+        from app.services.loyalty_service import cashback_points
+
+        child.points += cashback_points(tx.category, tx.amount_cents)
 
     @staticmethod
     async def _get_parent_scoped_purchase(
