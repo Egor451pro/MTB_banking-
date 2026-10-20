@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { api } from '../api'
 import { plural } from '../format'
 import { useData } from '../hooks'
-import { Btn, Card, Header, Loading, Progress, Row, Section } from '../ui'
+import { Btn, Card, Loading, Progress, Row, Sheet } from '../ui'
 import '../beaver.css'
 
 // Вкладка «Бобёр»: питомец строит плотину из брёвен.
@@ -16,10 +16,10 @@ import '../beaver.css'
 //  3) стройка закончена — кнопка «Открыть плотину», по нажатию плотина раскрывается.
 
 const LOGS_PER_BUILD = 5
-const LOGS_PER_5_BYN = 1
-const LOGS_PER_TASK = 3
-const LOGS_PER_GOAL_DONE = 20
-const LOGS_PER_LESSON = 2
+export const LOGS_PER_5_BYN = 1
+export const LOGS_PER_TASK = 3
+export const LOGS_PER_GOAL_DONE = 20
+export const LOGS_PER_LESSON = 2
 
 const PRE_WORK_MS = 250
 const THROW_GAP_MS = 800
@@ -36,10 +36,10 @@ export const DAM_LEVELS = [
   { n: 4, need: 80, title: 'Плотина с домиком' },
 ]
 
-const builtKey = (id: number) => `beaver:${id}`
-const shownKey = (id: number) => `beaver:${id}:lv`
+export const builtKey = (id: number) => `beaver:${id}`
+export const shownKey = (id: number) => `beaver:${id}:lv`
 const readyKey = (id: number) => `beaver:${id}:ready`
-function loadNum(key: string): number | null {
+export function loadNum(key: string): number | null {
   try {
     const v = localStorage.getItem(key)
     return v === null ? null : Number(v) || 0
@@ -52,14 +52,22 @@ function saveNum(key: string, v: number | null) {
   } catch { /* без хранилища просто не запоминаем */ }
 }
 
-function levelFor(built: number) {
+export function levelFor(built: number) {
   let lv = DAM_LEVELS[0]
   for (const l of DAM_LEVELS) if (built >= l.need) lv = l
   return lv
 }
-const levelByN = (n: number) => DAM_LEVELS.find((l) => l.n === n) ?? DAM_LEVELS[0]
-const damSrc = (n: number) => `/beaver/dam${n}.jpg`
-const logWord = (n: number) => plural(n, 'бревно', 'бревна', 'брёвен')
+export const levelByN = (n: number) => DAM_LEVELS.find((l) => l.n === n) ?? DAM_LEVELS[0]
+export const damSrc = (n: number) => `/beaver/dam${n}.jpg`
+export const logWord = (n: number) => plural(n, 'бревно', 'бревна', 'брёвен')
+
+/** Какой уровень плотины открыт у ребёнка — для главной, профиля и экрана родителя */
+export function beaverInfo(childId: number) {
+  const built = loadNum(builtKey(childId)) ?? 0
+  const shown = levelByN(loadNum(shownKey(childId)) ?? levelFor(built).n)
+  const next = DAM_LEVELS.find((l) => l.n === levelFor(built).n + 1)
+  return { level: shown, built, next }
+}
 
 /** Иконка бревна в стиле остальных иконок приложения (контур, без эмодзи) */
 function LogIcon({ size = 18, className = '' }: { size?: number; className?: string }) {
@@ -84,7 +92,8 @@ function LogShape() {
   )
 }
 
-export function BeaverScreen({ meId, ageGroup }: { meId: number; ageGroup: string }) {
+/** Блок с бобром и плотиной. Стоит наверху вкладки «Копилка». */
+export function BeaverPanel({ meId, ageGroup }: { meId: number; ageGroup: string }) {
   const teen = ageGroup === '14-17'
   const sprite = teen ? '/beaver/teen.png' : '/beaver/kid.png'
   const spriteCheer = teen ? '/beaver/teen.png' : '/beaver/kid-wave.png'
@@ -106,6 +115,7 @@ export function BeaverScreen({ meId, ageGroup }: { meId: number; ageGroup: strin
   const [pops, setPops] = useState<number[]>([])
   const [speech, setSpeech] = useState<string | null>(null)
   const [bump, setBump] = useState(0)
+  const [howTo, setHowTo] = useState(false)
 
   const sceneRef = useRef<HTMLDivElement>(null)
   const damRef = useRef<HTMLDivElement>(null)
@@ -193,7 +203,7 @@ export function BeaverScreen({ meId, ageGroup }: { meId: number; ageGroup: strin
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
-  if (!goals.data || !tasks.data || !lessons.data) return <><Header title="Бобёр" /><Loading /></>
+  if (!goals.data || !tasks.data || !lessons.data) return <Loading />
 
   const fromGoals = goals.data.items.reduce((s, x) => s + Math.floor(x.saved_cents / 500) * LOGS_PER_5_BYN + (x.status === 'done' ? LOGS_PER_GOAL_DONE : 0), 0)
   const fromTasks = tasks.data.items.filter((t) => t.status === 'confirmed').length * LOGS_PER_TASK
@@ -250,15 +260,7 @@ export function BeaverScreen({ meId, ageGroup }: { meId: number; ageGroup: strin
 
   return (
     <>
-      <Header
-        title="Бобёр"
-        right={
-          <div key={bump} className="anim-log flex items-center gap-1.5 rounded-full bg-white/20 px-3 py-1.5 text-[15px] font-semibold tabular-nums text-white">
-            <LogIcon size={18} />{balance}
-          </div>
-        }
-      />
-      <div className="space-y-4 px-4 pb-6 pt-4">
+      <div className="space-y-3">
         <div ref={sceneRef} className="relative aspect-[4/3.3] overflow-hidden rounded-[24px] bg-[#9CC7F2]">
           <div ref={damRef} className="absolute inset-0">
             {hidden ? (
@@ -326,6 +328,10 @@ export function BeaverScreen({ meId, ageGroup }: { meId: number; ageGroup: strin
             </span>
           ))}
 
+          <div key={bump} className="anim-log absolute right-3 top-3 z-10 flex items-center gap-1 rounded-full bg-white/90 px-2.5 py-1 text-xs font-semibold tabular-nums text-[#141416]">
+            <LogIcon size={15} />{balance}
+          </div>
+
           {!hidden && (
             <div key={`chip:${shown}`} className={`absolute left-3 top-3 rounded-full bg-white/90 px-3 py-1 text-xs font-semibold text-[#141416] ${revealing ? 'chip-in' : ''}`}>
               Уровень {shownLevel.n} · {shownLevel.title}
@@ -344,15 +350,20 @@ export function BeaverScreen({ meId, ageGroup }: { meId: number; ageGroup: strin
 
         <Btn onClick={build} disabled={busy || balance <= 0}>{btnText}</Btn>
 
-        <Section title="Откуда брёвна">
-          <Card className="divide-y divide-line p-0">
-            <Row icon="target" iconTone="blue" title="Пополнение цели" sub="1 бревно за каждые 5 BYN" />
-            <Row icon="tasks" iconTone="blue" title="Задание от родителя" sub={`${LOGS_PER_TASK} ${logWord(LOGS_PER_TASK)} после подтверждения`} />
-            <Row icon="check" iconTone="blue" title="Цель достигнута" sub={`${LOGS_PER_GOAL_DONE} брёвен`} />
-            <Row icon="book" iconTone="blue" title="Урок пройден" sub={`${LOGS_PER_LESSON} ${logWord(LOGS_PER_LESSON)}`} />
-          </Card>
-        </Section>
+        <button type="button" onClick={() => setHowTo(true)} className="mx-auto block text-[13px] font-medium text-muted underline-offset-2 hover:underline">
+          Как получить брёвна
+        </button>
       </div>
+
+      <Sheet open={howTo} onClose={() => setHowTo(false)} title="Как получить брёвна">
+        <Card className="divide-y divide-line p-0">
+          <Row icon="target" iconTone="blue" title="Отложить в цель" sub="1 бревно за каждые 5 BYN, бонус родителя тоже считается" />
+          <Row icon="tasks" iconTone="blue" title="Выполнить задание" sub={`${LOGS_PER_TASK} ${logWord(LOGS_PER_TASK)}, когда родитель подтвердит`} />
+          <Row icon="check" iconTone="blue" title="Достичь цели" sub={`${LOGS_PER_GOAL_DONE} брёвен`} />
+          <Row icon="book" iconTone="blue" title="Пройти урок" sub={`${LOGS_PER_LESSON} ${logWord(LOGS_PER_LESSON)}`} />
+        </Card>
+        <p className="mt-3 text-[13px] text-muted">Брёвна нельзя купить, только заработать. Чем больше уложено, тем выше уровень плотины.</p>
+      </Sheet>
     </>
   )
 }

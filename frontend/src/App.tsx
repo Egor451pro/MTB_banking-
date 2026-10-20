@@ -4,35 +4,37 @@ import { NavProvider, useNav } from './nav'
 import { BonusBannerHost, BottomNav, ToastHost, Loading, toast, type TabDef } from './ui'
 import { useData } from './hooks'
 import type { Me } from './types'
-import { ChildGoals, ChildHome, ChildLevel, ChildPay, ChildTasks, LessonScreen, RequestScreen } from './screens/child'
-import { BeaverScreen } from './screens/beaver'
+import { ChildBeaver, ChildHome, ChildMe, ChildPay, ChildSavings, ChildTasks, LessonScreen, RequestScreen } from './screens/child'
 import { LoyaltyScreen } from './screens/shared'
-import { ChildManage, PackageFlow, ParentHome, ParentProducts, ParentRequests, ParentTasks } from './screens/parent'
+import { KidPage, PackageFlow, ParentDecisions, ParentHome, ParentKids, ParentProducts, ParentTasks } from './screens/parent'
+import { MobyShell } from './screens/moby'
 import { LoginScreen } from './screens/auth'
 import { useTheme } from './theme'
 import { Icon } from './icons'
 
-function ParentShell() {
+// Раздел «Семья» для родителя. Открывается из вкладки «Семья» в Moby.
+function ParentShell({ onExit }: { onExit: () => void }) {
   const { tab, setTab, stack, back } = useNav()
   const fam = useData(() => api.getFamily(), [], 3000)
   const pp = useData(() => api.listPendingPurchases(), [], 3000)
   const pb = useData(() => api.listPendingBonuses(), [], 3000)
   const pending = (fam.data?.children.reduce((s, c) => s + c.pending_requests, 0) ?? 0) + (pp.data?.items.length ?? 0) + (pb.data?.items.length ?? 0)
   const tabs: TabDef[] = [
-    { id: 'home', label: 'Главная', icon: 'home' },
-    { id: 'products', label: 'Продукты', icon: 'card' },
-    { id: 'requests', label: 'Запросы', icon: 'bell', badge: pending },
+    { id: 'home', label: 'Главная', icon: 'home', badge: pending },
+    { id: 'kids', label: 'Дети', icon: 'heart' },
     { id: 'tasks', label: 'Задания', icon: 'tasks' },
+    { id: 'services', label: 'Услуги', icon: 'card' },
   ]
   const top = stack[stack.length - 1]
   let body
-  if (top?.name === 'child') body = <ChildManage key={top.params!.id} id={top.params!.id} />
-  else if (top?.name === 'package') body = <PackageFlow />
+  if (top?.name === 'package') body = <PackageFlow />
+  else if (top?.name === 'decisions') body = <ParentDecisions />
+  else if (top?.name === 'kid') body = <KidPage key={`${top.params!.id}:${top.params!.page}`} id={top.params!.id} page={top.params!.page} />
   else if (top?.name === 'loyalty') body = <LoyaltyScreen onBack={back} />
-  else if (tab === 'products') body = <ParentProducts />
-  else if (tab === 'requests') body = <ParentRequests />
+  else if (tab === 'kids') body = <ParentKids />
   else if (tab === 'tasks') body = <ParentTasks />
-  else body = <ParentHome />
+  else if (tab === 'services') body = <ParentProducts />
+  else body = <ParentHome onExit={onExit} />
   return (
     <>
       <div className="flex-1 overflow-y-auto"><div key={screenKey(tab, top)} className="anim-screen">{body}</div></div>
@@ -47,25 +49,30 @@ function screenKey(tab: string, top?: { name: string; params?: Record<string, un
 }
 
 function ChildShell({ me }: { me: Me }) {
-  const { tab, setTab, stack, back } = useNav()
+  const { tab, setTab, stack, back, push } = useNav()
+  // Симулятор покупки живёт в демо-панели над телефоном, а экран результата — внутри
+  useEffect(() => {
+    const h = () => push({ name: 'pay' })
+    window.addEventListener('demo-pay', h)
+    return () => window.removeEventListener('demo-pay', h)
+  }, [push])
   const tabs: TabDef[] = [
     { id: 'home', label: 'Главная', icon: 'home' },
-    { id: 'pay', label: 'Оплата', icon: 'card' },
-    { id: 'goals', label: 'Цели', icon: 'target' },
+    { id: 'savings', label: 'Копилка', icon: 'target' },
     { id: 'pet', label: 'Бобёр', icon: 'heart' },
     { id: 'tasks', label: 'Задания', icon: 'tasks' },
-    { id: 'level', label: 'Награды', icon: 'star' },
+    { id: 'me', label: 'Я', icon: 'star' },
   ]
   const top = stack[stack.length - 1]
   let body
   if (top?.name === 'request') body = <RequestScreen {...(top.params ?? {})} />
   else if (top?.name === 'lesson') body = <LessonScreen key={top.params!.id} id={top.params!.id} />
   else if (top?.name === 'loyalty') body = <LoyaltyScreen onBack={back} />
-  else if (tab === 'pay') body = <ChildPay meId={me.id} />
-  else if (tab === 'goals') body = <ChildGoals meId={me.id} />
-  else if (tab === 'pet') body = <BeaverScreen meId={me.id} ageGroup={me.age_group} />
+  else if (top?.name === 'pay') body = <ChildPay meId={me.id} />
+  else if (tab === 'savings') body = <ChildSavings meId={me.id} />
+  else if (tab === 'pet') body = <ChildBeaver meId={me.id} ageGroup={me.age_group} />
   else if (tab === 'tasks') body = <ChildTasks />
-  else if (tab === 'level') body = <ChildLevel meId={me.id} />
+  else if (tab === 'me') body = <ChildMe meId={me.id} />
   else body = <ChildHome meId={me.id} />
   return (
     <>
@@ -87,7 +94,9 @@ function Phone({ uid }: { uid: number }) {
   return (
     <NavProvider initialTab="home">
       <div className="flex h-full min-h-0 flex-1 flex-col">
-        {me.role === 'parent' ? <ParentShell /> : <ChildShell me={me} />}
+        {me.role === 'parent'
+          ? <MobyShell name={me.name} family={(exit) => <ParentShell onExit={exit} />} />
+          : <ChildShell me={me} />}
       </div>
     </NavProvider>
   )
@@ -199,7 +208,7 @@ export default function App() {
   return (
     <div className="flex min-h-[100dvh] flex-col items-center sm:gap-4 sm:py-5">
       <div className="flex w-full items-center justify-center gap-2 bg-card px-3 py-2 ring-1 ring-line sm:w-auto sm:rounded-full sm:py-1.5 sm:pl-4 sm:shadow-sm">
-        <span className="text-xs font-semibold text-muted">Демо{usingMock ? ' · mock' : ''}</span>
+        <span className="hidden whitespace-nowrap text-xs font-semibold text-muted sm:inline">Демо{usingMock ? ' · mock' : ''}</span>
         {user ? (
           <>
             <span className="text-[13px] font-semibold text-mt-ink">{user.name}</span>
@@ -214,11 +223,21 @@ export default function App() {
         ) : (
           <span className="text-[13px] font-medium text-muted">Вход в Moby</span>
         )}
+        {user?.role === 'child' && (
+          <button
+            type="button"
+            onClick={() => window.dispatchEvent(new Event('demo-pay'))}
+            title="Симулятор покупки картой ребёнка"
+            className="flex shrink-0 items-center gap-1 whitespace-nowrap rounded-full bg-elevated px-3 py-1 text-[13px] font-semibold text-muted transition hover:text-mt-ink"
+          >
+            <Icon name="card" size={14} />Покупка
+          </button>
+        )}
         <button
           type="button"
           onClick={resetDemo}
           title="Сбросить демо-данные"
-          className="flex items-center gap-1 rounded-full bg-elevated px-3 py-1 text-[13px] font-semibold text-muted transition hover:text-mt-ink"
+          className="flex shrink-0 items-center gap-1 whitespace-nowrap rounded-full bg-elevated px-3 py-1 text-[13px] font-semibold text-muted transition hover:text-mt-ink"
         >
           <Icon name="refresh" size={14} />Сбросить демо
         </button>

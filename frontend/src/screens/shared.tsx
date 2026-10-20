@@ -5,6 +5,7 @@ import { useData } from '../hooks'
 import { Icon } from '../icons'
 import { Badge, Btn, Card, Empty, Header, IconTile, Loading, Progress, Section, Sheet, useGrow, type BadgeTone } from '../ui'
 import type { AccessRequest, ChildDetail, Goal, Task, Transaction } from '../types'
+import { LOGS_PER_TASK, logWord } from './beaver'
 
 export function TxRow({ t, who }: { t: Transaction; who?: string }) {
   const declined = t.status === 'declined'
@@ -88,7 +89,7 @@ export function TaskHead({ t, who }: { t: Task; who?: string }) {
       <div className="min-w-0 flex-1">
         {who && <div className="text-xs font-semibold uppercase tracking-wide text-muted">{who}</div>}
         <div className="text-[15px] font-semibold text-mt-ink">{t.title}</div>
-        <div className="mt-0.5 text-[13px] tabular-nums text-muted">Награда {money(t.reward_cents)} · {t.xp_reward} XP</div>
+        <div className="mt-0.5 text-[13px] tabular-nums text-muted">Награда {money(t.reward_cents)} и {LOGS_PER_TASK} {logWord(LOGS_PER_TASK)} бобру</div>
       </div>
       <Badge tone={b.tone}>{b.t}</Badge>
     </div>

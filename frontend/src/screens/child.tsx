@@ -5,11 +5,12 @@ import { useData } from '../hooks'
 import { Icon, type IconName } from '../icons'
 import { useNav } from '../nav'
 import {
-  Avatar, BalanceCard, Badge, Btn, Card, Empty, Field, Header, IconTile, Loading, Note, Progress,
+  Avatar, BalanceCard, Badge, Btn, Card, Empty, Field, Header, IconTile, Loading, Note,
   Row, Section, Sheet, bonusBanner, toast,
 } from '../ui'
 import type { Category, DeclineReason, LessonResult, PayResult, PermissionKey, ReqType } from '../types'
-import { GoalCard, LevelRing, REQ_ICON, TaskHead, TxList, requestText } from './shared'
+import { GoalCard, REQ_ICON, TaskHead, TxList, requestText } from './shared'
+import { BeaverPanel, LOGS_PER_LESSON, beaverInfo, damSrc, logWord } from './beaver'
 
 // ───────── Главная ребёнка ─────────
 export function ChildHome({ meId }: { meId: number }) {
@@ -19,14 +20,13 @@ export function ChildHome({ meId }: { meId: number }) {
   const al = useData(() => api.getAllowance(meId), [meId])
   if (!c) return <><Header title="Привет!" /><Loading /></>
   const waiting = reqs.data?.items.filter((r) => r.status === 'pending').length ?? 0
-  const lv = c.level
 
   const actions: { icon: IconName; label: string; go: () => void }[] = [
-    { icon: 'card', label: 'Оплатить', go: () => setTab('pay') },
     { icon: 'chat', label: 'Попросить', go: () => push({ name: 'request' }) },
-    { icon: 'target', label: 'Цели', go: () => setTab('goals') },
+    { icon: 'target', label: 'Копилка', go: () => setTab('savings') },
     { icon: 'tasks', label: 'Задания', go: () => setTab('tasks') },
   ]
+  const beaver = beaverInfo(meId)
 
   return (
     <>
@@ -34,7 +34,7 @@ export function ChildHome({ meId }: { meId: number }) {
       <div className="-mt-12 space-y-5 px-4 pb-6">
         <BalanceCard card={c.card} title="Мой баланс" limit={c.limits_today} />
 
-        <div className="grid grid-cols-4 gap-2">
+        <div className="grid grid-cols-3 gap-2">
           {actions.map((a) => (
             <button key={a.label} onClick={a.go} className="flex flex-col items-center gap-1.5 rounded-[20px] bg-card py-3 transition active:scale-[0.97]">
               <IconTile name={a.icon} />
@@ -48,17 +48,14 @@ export function ChildHome({ meId }: { meId: number }) {
         )}
         {waiting > 0 && <Note icon="clock">Ждут ответа родителя: {waiting}</Note>}
 
-        <Card onClick={() => setTab('level')}>
-          <div className="flex items-center gap-3">
-            <IconTile name="star" tone="solid" />
-            <div className="min-w-0 flex-1">
-              <div className="text-[15px] font-semibold text-mt-ink">Уровень {lv.level}</div>
-              <div className="text-[13px] tabular-nums text-muted">{lv.xp_to_next > 0 ? `Ещё ${lv.xp_to_next} XP до уровня ${lv.level + 1}` : 'Максимальный уровень'}</div>
-            </div>
-            <Icon name="chevron-right" size={20} className="text-[#9AA6B8]" />
+        <button type="button" onClick={() => setTab('pet')} className="flex w-full items-center gap-3 rounded-[20px] bg-card p-3 text-left transition active:scale-[0.99]">
+          <img src={damSrc(beaver.level.n)} alt="" className="h-14 w-16 shrink-0 rounded-[14px] object-cover" />
+          <div className="min-w-0 flex-1">
+            <div className="text-[15px] font-semibold text-mt-ink">Бобёр · уровень {beaver.level.n}</div>
+            <div className="text-[13px] text-muted">{beaver.level.title}{beaver.next ? `. До следующего ${Math.max(0, beaver.next.need - beaver.built)} ${logWord(Math.max(0, beaver.next.need - beaver.built))}` : ''}</div>
           </div>
-          {lv.xp_to_next > 0 && <div className="mt-3"><Progress value={lv.xp} max={lv.xp + lv.xp_to_next} tone="brand" /></div>}
-        </Card>
+          <Icon name="chevron-right" size={20} className="text-[#9AA6B8]" />
+        </button>
 
         <Section title="Последние операции">
           <TxList childId={meId} limit={5} poll={2000} />
@@ -83,10 +80,10 @@ const MERCHANTS: Merchant[] = [
 ]
 
 export function ChildPay({ meId }: { meId: number }) {
-  const { push } = useNav()
+  const { push, back } = useNav()
   const { data: c, reload } = useData(() => api.getChild(meId), [meId])
   const [res, setRes] = useState<{ m: Merchant; r: PayResult } | null>(null)
-  if (!c) return <><Header title="Оплата" /><Loading /></>
+  if (!c) return <><Header title="Покупка картой" onBack={back} /><Loading /></>
 
   async function pay(m: Merchant) {
     try {
@@ -111,7 +108,7 @@ export function ChildPay({ meId }: { meId: number }) {
   const result = res?.r.status
   return (
     <>
-      <Header title="Оплата" subtitle="Демо: банк проверяет каждую покупку" />
+      <Header title="Покупка картой" subtitle="Демо: банк проверяет каждую покупку" onBack={back} />
       <div className="space-y-5 p-4">
         <Card className="grid grid-cols-2 divide-x divide-line p-0">
           <div className="px-4 py-3">
@@ -278,8 +275,33 @@ export function RequestScreen({ type: t0, amount: a0, category: c0, permission: 
   )
 }
 
-// ───────── Цели ─────────
-export function ChildGoals({ meId }: { meId: number }) {
+// ───────── Копилка: цели ─────────
+export function ChildSavings({ meId }: { meId: number }) {
+  const { data } = useData(() => api.getGoals(meId), [meId], 3000)
+  const saved = data ? data.items.reduce((s, g) => s + g.saved_cents, 0) : 0
+  return (
+    <>
+      <Header title="Копилка" subtitle={data ? `Отложено ${money(saved)}` : undefined} />
+      <div className="p-4">
+        <GoalsPanel meId={meId} />
+      </div>
+    </>
+  )
+}
+
+// ───────── Бобёр: отдельная вкладка ─────────
+export function ChildBeaver({ meId, ageGroup }: { meId: number; ageGroup: string }) {
+  return (
+    <>
+      <Header title="Бобёр" subtitle="Копи и выполняй задания, а бобёр строит плотину" />
+      <div className="p-4">
+        <BeaverPanel meId={meId} ageGroup={ageGroup} />
+      </div>
+    </>
+  )
+}
+
+function GoalsPanel({ meId }: { meId: number }) {
   const { push } = useNav()
   const { data, reload } = useData(() => api.getGoals(meId), [meId], 3000)
   const perms = useData(() => api.getPermissions(meId), [meId], 3000)
@@ -303,12 +325,10 @@ export function ChildGoals({ meId }: { meId: number }) {
     seenBonus.current = bonusTotal
     try { localStorage.setItem(key, String(bonusTotal)) } catch { /* ничего страшного */ }
   }, [bonusTotal, meId])
-  if (!data) return <><Header title="Мои цели" /><Loading /></>
-  const saved = data.items.reduce((s, g) => s + g.saved_cents, 0)
+  if (!data) return <Loading />
   return (
     <>
-      <Header title="Мои цели" subtitle={`Отложено ${money(saved)}`} />
-      <div className="space-y-3 p-4">
+      <div className="space-y-3">
         {perms.data && !perms.data.items.find((p) => p.key === 'goals')?.enabled
           ? (
             <>
@@ -368,13 +388,17 @@ export function ChildGoals({ meId }: { meId: number }) {
 
 // ───────── Задания ─────────
 export function ChildTasks() {
+  const { push } = useNav()
   const { data, reload } = useData(() => api.listTasks(), [], 3000)
+  const lessons = useData(() => api.getLessons(), [], 3000)
   if (!data) return <><Header title="Задания" /><Loading /></>
   const fresh = data.items.filter((t) => t.status === 'new').length
+  const lessonsDone = lessons.data?.items.filter((l) => l.completed).length ?? 0
   return (
     <>
       <Header title="Задания" subtitle={fresh ? `Новых: ${fresh}` : 'Выполняй и получай награду'} />
       <div className="space-y-3 p-4">
+        <div className="px-1 pt-1 text-[13px] font-semibold uppercase tracking-wide text-muted">От родителя</div>
         {!data.items.length && <Empty text="Родитель пока не дал заданий" icon="tasks" />}
         {data.items.map((t) => (
           <Card key={t.id}>
@@ -386,58 +410,63 @@ export function ChildTasks() {
             )}
           </Card>
         ))}
+
+        <div className="flex items-baseline justify-between px-1 pt-4">
+          <div className="text-[13px] font-semibold uppercase tracking-wide text-muted">Уроки</div>
+          <div className="text-[13px] tabular-nums text-muted">{lessonsDone} из {lessons.data?.items.length ?? 0}</div>
+        </div>
+        <Card className="divide-y divide-line p-0">
+          {(lessons.data?.items ?? []).map((l) => (
+            <Row
+              key={l.id} icon={l.completed ? 'check' : 'book'} iconTone={l.completed ? 'solid' : 'blue'} chevron
+              title={l.title} sub={l.completed ? 'Пройден' : `${LOGS_PER_LESSON} ${logWord(LOGS_PER_LESSON)} и ${l.points_reward} баллов`}
+              onClick={() => push({ name: 'lesson', params: { id: l.id } })}
+            />
+          ))}
+        </Card>
       </div>
     </>
   )
 }
 
-// ───────── Награды: уровень, баллы, уроки, мои возможности ─────────
-export function ChildLevel({ meId }: { meId: number }) {
-  const { push } = useNav()
-  const { data: c } = useData(() => api.getChild(meId), [meId], 2000)
-  const lessons = useData(() => api.getLessons(), [], 3000)
+// ───────── Я: уровень, баллы, что разрешил родитель ─────────
+export function ChildMe({ meId }: { meId: number }) {
+  const { push, setTab } = useNav()
+  const { data: c } = useData(() => api.getChild(meId), [meId], 3000)
   const loyalty = useData(() => api.getLoyalty(), [], 3000)
   const perms = useData(() => api.getPermissions(meId), [meId], 3000)
-  if (!c) return <><Header title="Награды" /><Loading /></>
-  const lv = c.level
-  const done = lessons.data?.items.filter((l) => l.completed).length ?? 0
+  const reqs = useData(() => api.listRequests(), [], 3000)
+  if (!c) return <><Header title="Я" /><Loading /></>
+  const beaver = beaverInfo(meId)
+  const waiting = reqs.data?.items.filter((r) => r.status === 'pending').length ?? 0
   return (
     <>
-      <Header title="Награды" subtitle="Учись, копи и расти" tall />
-      <div className="-mt-12 space-y-5 px-4 pb-6">
-        <Card className="flex items-center gap-4 shadow-[0_10px_30px_-18px_rgba(20,20,22,0.35)]">
-          <LevelRing level={lv} />
-          <div className="min-w-0 flex-1">
-            <div className="text-[13px] tabular-nums text-muted">{lv.xp} XP</div>
-            <div className="text-[15px] font-semibold text-mt-ink">{lv.xp_to_next > 0 ? `Ещё ${lv.xp_to_next} XP до уровня ${lv.level + 1}` : 'Максимальный уровень'}</div>
-            <button onClick={() => push({ name: 'loyalty' })} className="mt-3 flex w-full items-center gap-2 rounded-2xl bg-elevated px-3 py-2.5 text-left">
-              <Icon name="coins" size={20} className="text-[#2F6FE4]" />
-              <span className="flex-1 text-sm font-semibold tabular-nums text-mt-ink">{(loyalty.data?.points ?? 0).toLocaleString('ru-RU')} баллов</span>
-              <Icon name="chevron-right" size={18} className="text-[#A3ABB8]" />
-            </button>
-          </div>
+      <Header title={c.name} subtitle={`${c.age_group.replace('-', '–')} лет · карта •• ${c.card.last4}`} right={<Avatar name={c.name} light size={38} />} />
+      <div className="space-y-5 p-4">
+        <Card className="divide-y divide-line p-0">
+          <Row
+            icon="star" iconTone="solid" chevron onClick={() => setTab('pet')}
+            title={`Уровень ${beaver.level.n} · ${beaver.level.title}`}
+            sub={beaver.next ? `До следующего ${Math.max(0, beaver.next.need - beaver.built)} ${logWord(Math.max(0, beaver.next.need - beaver.built))}` : 'Все уровни пройдены'}
+          />
+          <Row
+            icon="coins" chevron onClick={() => push({ name: 'loyalty' })}
+            title={`${(loyalty.data?.points ?? 0).toLocaleString('ru-RU')} баллов`} sub="Скидки и подарки у партнёров"
+          />
+          <Row
+            icon="chat" chevron onClick={() => push({ name: 'request' })}
+            title="Мои запросы родителю" sub={waiting ? `Ждут ответа: ${waiting}` : 'Попросить деньги или доступ'}
+          />
         </Card>
 
-        <Section title="Уроки" action={<span className="text-sm tabular-nums text-muted">{done} из {lessons.data?.items.length ?? 0}</span>}>
-          <Card className="divide-y divide-line p-0">
-            {(lessons.data?.items ?? []).map((l) => (
-              <Row
-                key={l.id} icon={l.completed ? 'check' : 'book'} iconTone={l.completed ? 'solid' : 'blue'} chevron
-                title={l.title} sub={l.completed ? 'Пройден' : `+${l.xp_reward} XP · +${l.points_reward} баллов`}
-                onClick={() => push({ name: 'lesson', params: { id: l.id } })}
-              />
-            ))}
-          </Card>
-        </Section>
-
-        <Section title="Мои возможности">
+        <Section title="Что разрешил родитель">
           <Card className="divide-y divide-line p-0">
             {(perms.data?.items ?? []).map((p) => {
               const info = PERMISSION_INFO[p.key]
               return (
                 <Row
                   key={p.key} icon={info.icon} iconTone={p.enabled ? 'blue' : 'gray'} title={info.title}
-                  sub={p.enabled ? 'Доступно' : p.locked_reason ?? 'Выключено родителем'}
+                  sub={p.enabled ? 'Можно' : p.locked_reason ?? 'Пока нельзя'}
                   right={p.enabled || p.locked_reason ? undefined : (
                     <Btn small full={false} tone="secondary" onClick={() => push({ name: 'request', params: { type: 'product_access', permission: p.key } })}>Попросить</Btn>
                   )}
@@ -447,7 +476,7 @@ export function ChildLevel({ meId }: { meId: number }) {
           </Card>
         </Section>
 
-        <p className="px-1 text-xs text-muted">В 18 лет предложим тебе взрослую карту — перейти можно будет по твоему желанию, баллы сохранятся.</p>
+        <p className="px-1 text-xs text-muted">В 18 лет предложим тебе взрослую карту. Перейти можно будет по желанию, баллы сохранятся.</p>
       </div>
     </>
   )
@@ -503,7 +532,7 @@ export function LessonScreen({ id }: { id: number }) {
         {result?.correct && (
           <>
             <div className="text-center text-sm text-muted">
-              {wasDone ? 'Урок уже был пройден — награда начисляется один раз' : `+${lesson.xp_reward} XP и +${lesson.points_reward} баллов`}
+              {wasDone ? 'Урок уже был пройден, награда начисляется один раз' : `+${LOGS_PER_LESSON} ${logWord(LOGS_PER_LESSON)} и +${lesson.points_reward} баллов`}
             </div>
             <Btn onClick={back}>Готово</Btn>
           </>
