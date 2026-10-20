@@ -1,0 +1,378 @@
+"""
+Скрипт инициализации демо-данных для базы данных.
+Создает семью с мамой, Мишей (10 лет) и Аней (15 лет), карты, лимиты и транзакции.
+Поддерживает повторный запуск (очищает данные перед заполнением).
+"""
+import asyncio
+from datetime import datetime, timedelta, date
+from sqlalchemy import delete
+import pytz
+
+from app.db import AsyncSessionLocal, init_db
+from app.models import (
+    Family, User, UserRole, Account, AccountType, AccountStatus,
+    Limit, LimitPeriod, Transaction, TransactionDirection, TransactionStatus,
+    Consent, Goal, GoalStatus, Task, TaskStatus, AccessRequest, RequestStatus, RequestType
+)
+
+
+async def clear_all_tables(session):
+    """Очищает все таблицы перед заполнением"""
+    print("🗑️  Очистка таблиц...")
+    
+    # Порядок важен из-за внешних ключей
+    await session.execute(delete(LessonProgress))
+    await session.execute(delete(Lesson))
+    await session.execute(delete(AccessRequest))
+    await session.execute(delete(Task))
+    await session.execute(delete(Goal))
+    await session.execute(delete(Transaction))
+    await session.execute(delete(Limit))
+    await session.execute(delete(Consent))
+    await session.execute(delete(Account))
+    await session.execute(delete(User))
+    await session.execute(delete(Family))
+    
+    await session.commit()
+    print("✅ Таблицы очищены")
+
+
+async def seed_data():
+    """Наполняет БД демо-данными"""
+    print("🌱 Начинаем заполнение базы данных...")
+    
+    # Инициализация БД (создание таблиц)
+    await init_db()
+    
+    async with AsyncSessionLocal() as session:
+        # Очищаем таблицы
+        await clear_all_tables(session)
+        
+        # 1. Создаем семью
+        print("👨‍👩‍👧‍👦 Создаем семью...")
+        family = Family(
+            id=1,
+            name="Семья Ивановых",
+            plan="basic"
+        )
+        session.add(family)
+        await session.flush()
+        
+        # 2. Создаем пользователей
+        print("👤 Создаем пользователей...")
+        
+        # Мама (parent, id=1)
+        mama = User(
+            id=1,
+            family_id=family.id,
+            role=UserRole.PARENT,
+            name="Мама",
+            birth_date=date(1988, 4, 10),
+            xp=0,
+            level=1,
+            points=0
+        )
+        session.add(mama)
+        
+        # Миша (child, id=2, 10 лет)
+        misha = User(
+            id=2,
+            family_id=family.id,
+            role=UserRole.CHILD,
+            name="Миша",
+            birth_date=date(2016, 3, 2),
+            xp=100,
+            level=2,
+            points=0
+        )
+        session.add(misha)
+        
+        # Аня (child, id=3, 15 лет)
+        anya = User(
+            id=3,
+            family_id=family.id,
+            role=UserRole.CHILD,
+            name="Аня",
+            birth_date=date(2011, 6, 20),
+            xp=260,
+            level=3,
+            points=0
+        )
+        session.add(anya)
+        
+        await session.flush()
+        
+        # 3. Создаем согласия (consents)
+        print("📝 Создаем согласия...")
+        
+        # Для Миши (7-13 лет) - без онлайн-платежей
+        session.add(Consent(child_id=misha.id, consent_type="card_issue"))
+        session.add(Consent(child_id=misha.id, consent_type="moby_access"))
+        
+        # Для Ани (14-17 лет) - с онлайн-платежами
+        session.add(Consent(child_id=anya.id, consent_type="card_issue"))
+        session.add(Consent(child_id=anya.id, consent_type="moby_access"))
+        session.add(Consent(child_id=anya.id, consent_type="online_payments"))
+        
+        # 4. Создаем карты
+        print("💳 Создаем карты...")
+        
+        misha_card = Account(
+            id=10,
+            owner_id=misha.id,
+            type=AccountType.CARD,
+            balance_cents=1250,  # 12.50 BYN
+            currency="BYN",
+            status=AccountStatus.ACTIVE,
+            card_last4="4412"
+        )
+        session.add(misha_card)
+        
+        anya_card = Account(
+            id=11,
+            owner_id=anya.id,
+            type=AccountType.CARD,
+            balance_cents=4300,  # 43.00 BYN
+            currency="BYN",
+            status=AccountStatus.ACTIVE,
+            card_last4="7781"
+        )
+        session.add(anya_card)
+        
+        await session.flush()
+        
+        # 5. Создаем лимиты
+        print("🚦 Создаем лимиты...")
+        
+        # Лимиты для Миши
+        session.add(Limit(
+            child_id=misha.id,
+            category=None,  # Общий лимит
+            period=LimitPeriod.DAY,
+            amount_cents=1000,  # 10 BYN в день
+            is_blocked=False
+        ))
+        session.add(Limit(
+            child_id=misha.id,
+            category="games",
+            period=LimitPeriod.DAY,
+            amount_cents=0,
+            is_blocked=True  # Игры запрещены
+        ))
+        session.add(Limit(
+            child_id=misha.id,
+            category="subscriptions",
+            period=LimitPeriod.DAY,
+            amount_cents=0,
+            is_blocked=True  # Подписки запрещены
+        ))
+        
+        # Лимиты для Ани
+        session.add(Limit(
+            child_id=anya.id,
+            category=None,  # Общий лимит
+            period=LimitPeriod.DAY,
+            amount_cents=2500,  # 25 BYN в день
+            is_blocked=False
+        ))
+        session.add(Limit(
+            child_id=anya.id,
+            category="games",
+            period=LimitPeriod.DAY,
+            amount_cents=0,
+            is_blocked=True  # Игры запрещены
+        ))
+        
+        # 6. Создаем транзакции
+        print("💸 Создаем транзакции...")
+        
+        minsk_tz = pytz.timezone("Europe/Minsk")
+        now = datetime.now(minsk_tz)
+        
+        def minutes_ago(minutes: int) -> datetime:
+            return now - timedelta(minutes=minutes)
+        
+        # Транзакции для Миши
+        transactions_misha = [
+            # Пополнение от родителя
+            Transaction(
+                account_id=misha_card.id,
+                amount_cents=2000,
+                direction=TransactionDirection.IN,
+                category=None,
+                merchant="Пополнение от родителя",
+                is_online=False,
+                status=TransactionStatus.APPROVED,
+                decline_reason=None,
+                created_at=minutes_ago(60 * 26)
+            ),
+            # Оплата в столовой
+            Transaction(
+                account_id=misha_card.id,
+                amount_cents=300,
+                direction=TransactionDirection.OUT,
+                category="food",
+                merchant="Столовая школы",
+                is_online=False,
+                status=TransactionStatus.APPROVED,
+                decline_reason=None,
+                created_at=minutes_ago(60 * 25)
+            ),
+            # Оплата автобуса
+            Transaction(
+                account_id=misha_card.id,
+                amount_cents=120,
+                direction=TransactionDirection.OUT,
+                category="transport",
+                merchant="Автобус",
+                is_online=False,
+                status=TransactionStatus.APPROVED,
+                decline_reason=None,
+                created_at=minutes_ago(60 * 24)
+            ),
+            # Попытка купить игру (отказ)
+            Transaction(
+                account_id=misha_card.id,
+                amount_cents=1500,
+                direction=TransactionDirection.OUT,
+                category="games",
+                merchant="Игровой магазин",
+                is_online=False,
+                status=TransactionStatus.DECLINED,
+                decline_reason="category_blocked",
+                created_at=minutes_ago(60 * 5)
+            ),
+            # Еще пара операций
+            Transaction(
+                account_id=misha_card.id,
+                amount_cents=150,
+                direction=TransactionDirection.OUT,
+                category="food",
+                merchant="Магазин у школы",
+                is_online=False,
+                status=TransactionStatus.APPROVED,
+                decline_reason=None,
+                created_at=minutes_ago(60 * 3)
+            ),
+            Transaction(
+                account_id=misha_card.id,
+                amount_cents=180,
+                direction=TransactionDirection.OUT,
+                category="transport",
+                merchant="Автобус",
+                is_online=False,
+                status=TransactionStatus.APPROVED,
+                decline_reason=None,
+                created_at=minutes_ago(60 * 2)
+            ),
+        ]
+        
+        # Транзакции для Ани
+        transactions_anya = [
+            # Пополнение
+            Transaction(
+                account_id=anya_card.id,
+                amount_cents=5000,
+                direction=TransactionDirection.IN,
+                category=None,
+                merchant="Пополнение от родителя",
+                is_online=False,
+                status=TransactionStatus.APPROVED,
+                decline_reason=None,
+                created_at=minutes_ago(60 * 20)
+            ),
+            # Покупка в кофейне
+            Transaction(
+                account_id=anya_card.id,
+                amount_cents=500,
+                direction=TransactionDirection.OUT,
+                category="food",
+                merchant="Кофейня",
+                is_online=False,
+                status=TransactionStatus.APPROVED,
+                decline_reason=None,
+                created_at=minutes_ago(60 * 3)
+            ),
+            # Покупка канцелярии
+            Transaction(
+                account_id=anya_card.id,
+                amount_cents=200,
+                direction=TransactionDirection.OUT,
+                category="education",
+                merchant="Книжный магазин",
+                is_online=False,
+                status=TransactionStatus.APPROVED,
+                decline_reason=None,
+                created_at=minutes_ago(60 * 1)
+            ),
+        ]
+        
+        for tx in transactions_misha + transactions_anya:
+            session.add(tx)
+        
+        # 7. Создаем цели (goals)
+        print("🎯 Создаем цели...")
+        
+        session.add(Goal(
+            child_id=misha.id,
+            title="Велосипед",
+            target_cents=30000,  # 300 BYN
+            saved_cents=5000,    # 50 BYN накоплено
+            parent_bonus_percent=10,
+            status=GoalStatus.ACTIVE
+        ))
+        
+        # 8. Создаем задания (tasks)
+        print("✅ Создаем задания...")
+        
+        session.add(Task(
+            assigned_to=misha.id,
+            title="Убрать в комнате",
+            reward_cents=200,
+            xp_reward=30,
+            status=TaskStatus.NEW,
+            due_date=None
+        ))
+        
+        session.add(Task(
+            assigned_to=misha.id,
+            title="Вынести мусор",
+            reward_cents=100,
+            xp_reward=15,
+            status=TaskStatus.DONE,
+            due_date=None
+        ))
+        
+        # 9. Создаем запросы (access_requests)
+        print("🙋 Создаем запросы...")
+        
+        session.add(AccessRequest(
+            child_id=misha.id,
+            type=RequestType.MONEY,
+            amount_cents=500,
+            category=None,
+            comment="На экскурсию",
+            status=RequestStatus.PENDING,
+            created_at=minutes_ago(20)
+        ))
+        
+        # Коммитим все изменения
+        await session.commit()
+        
+        print("✅ База данных успешно заполнена!")
+        print("\n📊 Созданные данные:")
+        print(f"   - Семья: {family.name}")
+        print(f"   - Пользователи: Мама (id=1), Миша (id=2), Аня (id=3)")
+        print(f"   - Карты: 2 шт")
+        print(f"   - Лимиты: 5 шт")
+        print(f"   - Транзакции: {len(transactions_misha) + len(transactions_anya)} шт")
+        print(f"   - Цели: 1 шт")
+        print(f"   - Задания: 2 шт")
+        print(f"   - Запросы: 1 шт")
+
+
+if __name__ == "__main__":
+    # Импорт моделей для предотвращения проблем с circular imports
+    from app.models import LessonProgress, Lesson
+    
+    asyncio.run(seed_data())
