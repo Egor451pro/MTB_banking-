@@ -28,13 +28,15 @@ interface DB {
   perms: Record<number, Record<PermissionKey, boolean>> // права ребёнка в Moby
   allowance: Record<number, Omit<Allowance, 'next_date'>>
   lessonsDone: Record<number, number[]>
+  bonuses: { id: number; child_id: number; goal_id: number; amount_cents: number; status: 'pending' | 'credited' | 'rejected'; created_at: string }[]  // крупные бонусы на подтверждении
   bonusMonth: Record<number, { month: string; spent: number }>  // сколько бонуса родителя начислено ребёнку в месяце
   accepted: Record<number, boolean>    // принято ли предложение уровня
-  seq: { tx: number; req: number; goal: number; task: number; user: number; acc: number }
+  seq: { tx: number; req: number; goal: number; task: number; user: number; acc: number; bonus: number }
 }
 
 // Бонус родителя к накоплениям: не больше 10 BYN в месяц на ребёнка (как на бэкенде)
 const BONUS_MONTH_CAP = 1000
+const BONUS_CONFIRM = 1000  // бонус за один взнос от этой суммы подтверждает родитель
 const monthKey = () => new Date().toISOString().slice(0, 7)
 
 // Уроки финансовой грамотности: правильный ответ знает только «сервер»
@@ -155,8 +157,9 @@ function seed(): DB {
     allowance: { 2: { amount_cents: 1000, period: 'week', active: true }, 3: { amount_cents: 2000, period: 'week', active: true } },
     lessonsDone: { 3: [1, 3] },
     accepted: {},
+    bonuses: [],
     bonusMonth: {},
-    seq: { tx: 6, req: 1, goal: 1, task: 2, user: 3, acc: 11 },
+    seq: { tx: 6, req: 1, goal: 1, task: 2, user: 3, acc: 11, bonus: 0 },
   }
 }
 
@@ -172,6 +175,25 @@ export function mockApi(): Api {
     const b = db.bonusMonth[childId]
     const spent = b && b.month === monthKey() ? b.spent : 0
     return Math.max(0, BONUS_MONTH_CAP - spent)
+  }
+
+  function decideBonus(id: number, approve: boolean) {
+    const m = requireParent()
+    const b = db.bonuses.find((x) => x.id === id)
+    if (!b || user(b.child_id).family_id !== m.family_id) throw new MockError('not_found', 'Бонус не найден')
+    if (b.status !== 'pending') throw new MockError('conflict', 'Бонус уже обработан')
+    const g = db.goals.find((x) => x.id === b.goal_id)!
+    b.status = approve ? 'credited' : 'rejected'
+    if (!approve) {
+      const bm = db.bonusMonth[b.child_id]
+      if (bm) bm.spent = Math.max(0, bm.spent - b.amount_cents)
+    }
+    if (approve) {
+      g.saved_cents += b.amount_cents
+      g.bonus_cents = (g.bonus_cents ?? 0) + b.amount_cents
+      if (g.saved_cents >= g.target_cents) g.status = 'done'
+    }
+    return delay({ id, status: b.status as 'credited' | 'rejected', saved_cents: g.saved_cents })
   }
 
   const user = (id: number) => {
@@ -466,13 +488,28 @@ export function mockApi(): Api {
       // Бонус родителя начисляется сразу: процент от взноса, но не больше остатка лимита месяца
       const left = bonusLeft(c.id)
       const bonus = Math.min(Math.floor((amount * g.parent_bonus_percent) / 100), left)
+      // Крупный бонус (от 10 BYN) ждёт подтверждения родителя, обычный начисляется сразу
+      const needsConfirm = bonus >= BONUS_CONFIRM
+      const credited = needsConfirm ? 0 : bonus
       a.balance_cents -= amount
-      g.saved_cents += amount + bonus
-      g.bonus_cents = (g.bonus_cents ?? 0) + bonus
+      g.saved_cents += amount + credited
+      g.bonus_cents = (g.bonus_cents ?? 0) + credited
+      if (needsConfirm) db.bonuses.push({ id: ++db.seq.bonus, child_id: c.id, goal_id: g.id, amount_cents: bonus, status: 'pending', created_at: new Date().toISOString() })
       if (bonus > 0) db.bonusMonth[c.id] = { month: monthKey(), spent: BONUS_MONTH_CAP - left + bonus }
       if (g.saved_cents >= g.target_cents) g.status = 'done'
-      return delay({ saved_cents: g.saved_cents, card_balance_cents: a.balance_cents, bonus_cents: bonus, bonus_left_cents: left - bonus, status: g.status })
+      return delay({ saved_cents: g.saved_cents, card_balance_cents: a.balance_cents, bonus_cents: credited, bonus_pending_cents: needsConfirm ? bonus : 0, bonus_left_cents: left - bonus, status: g.status })
     },
+
+    async listPendingBonuses() {
+      const m = requireParent()
+      const items = db.bonuses
+        .filter((b) => b.status === 'pending' && user(b.child_id).family_id === m.family_id)
+        .map((b) => ({ id: b.id, child_id: b.child_id, child_name: user(b.child_id).name, goal_title: db.goals.find((g) => g.id === b.goal_id)?.title ?? '', amount_cents: b.amount_cents, created_at: b.created_at }))
+      return delay({ items })
+    },
+
+    async approveBonus(id) { return decideBonus(id, true) },
+    async rejectBonus(id) { return decideBonus(id, false) },
 
     async setGoalBonus(id, percent) {
       requireParent()

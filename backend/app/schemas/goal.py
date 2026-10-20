@@ -2,6 +2,7 @@
 Pydantic схемы для целей (goals)
 """
 from pydantic import BaseModel, Field
+from datetime import datetime
 from typing import List, Literal
 
 
@@ -52,6 +53,7 @@ class DepositGoalResponse(BaseModel):
     saved_cents: int
     card_balance_cents: int
     bonus_cents: int = 0             # бонус родителя, начисленный за этот взнос
+    bonus_pending_cents: int = 0     # крупный бонус, ждёт подтверждения родителя
     bonus_left_cents: int = 0        # остаток месячного лимита бонуса
     status: GoalStatus
 
@@ -64,3 +66,23 @@ class SetBonusRequest(BaseModel):
 class SetBonusResponse(BaseModel):
     """Ответ на установку бонуса"""
     parent_bonus_percent: int
+
+
+class PendingBonusItem(BaseModel):
+    """Крупный бонус, ждущий подтверждения родителя"""
+    id: int
+    child_id: int
+    child_name: str
+    goal_title: str
+    amount_cents: int
+    created_at: datetime
+
+
+class PendingBonusesResponse(BaseModel):
+    items: List[PendingBonusItem]
+
+
+class BonusDecisionResponse(BaseModel):
+    id: int
+    status: Literal["credited", "rejected"]
+    saved_cents: int

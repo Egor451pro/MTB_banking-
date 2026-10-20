@@ -61,6 +61,9 @@ export function realApi(base: string): Api {
     demoReset: () => post('/demo/reset'),
 
     listPendingPurchases: () => get('/purchases/pending'),
+    listPendingBonuses: () => get('/bonuses/pending'),
+    approveBonus: (id) => post(`/bonuses/${id}/approve`),
+    rejectBonus: (id) => post(`/bonuses/${id}/reject`),
     approvePurchase: (id) => post(`/transactions/${id}/approve`),
     declinePurchase: (id) => post(`/transactions/${id}/decline`),
     getAllowance: (id) => get(`/children/${id}/allowance`),

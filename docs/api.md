@@ -406,3 +406,12 @@ Parent видит задания своих детей, child только св�
 - Ответ на взнос: `bonus_cents` (бонус за этот взнос) и `bonus_left_cents` (остаток лимита месяца).
 - `GET /children/{id}/goals`: у каждой цели `bonus_cents` (сколько бонуса уже внутри накоплений), а в корне `bonus_month_cap_cents` и `bonus_month_left_cents`.
 - Бонус называется «бонус родителя к накоплениям», а не процентом по вкладу: это подарок родителя, а не продукт банка.
+
+### Подтверждение крупного бонуса
+
+Если бонус за один взнос ≥ 10 BYN (`BONUS_CONFIRM_CENTS`), он не начисляется сразу: взнос проходит, а бонус получает статус `pending` и ждёт родителя. Ответ `POST /goals/{id}/deposit` содержит `bonus_pending_cents` (а `bonus_cents` = 0). Ждущий бонус учитывается в месячном лимите; отклонённый — нет.
+
+- `GET /bonuses/pending` (родитель) → `{items: [{id, child_id, child_name, goal_title, amount_cents, created_at}]}`
+- `POST /bonuses/{id}/approve` (родитель) → `{id, status: "credited", saved_cents}`; бонус входит в накопления
+- `POST /bonuses/{id}/reject` (родитель) → `{id, status: "rejected", saved_cents}`
+- повторное решение → 409, чужая семья → 404, ребёнок → 403

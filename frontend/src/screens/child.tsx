@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { api, session } from '../api'
 import { CATEGORY_ICON, CATEGORY_LABEL, PERMISSION_INFO, dateShort, money, toCents } from '../format'
 import { useData } from '../hooks'
@@ -6,7 +6,7 @@ import { Icon, type IconName } from '../icons'
 import { useNav } from '../nav'
 import {
   Avatar, BalanceCard, Badge, Btn, Card, Empty, Field, Header, IconTile, Loading, Note, Progress,
-  Row, Section, Sheet, toast,
+  Row, Section, Sheet, bonusBanner, toast,
 } from '../ui'
 import type { Category, DeclineReason, LessonResult, PayResult, PermissionKey, ReqType } from '../types'
 import { GoalCard, LevelRing, REQ_ICON, TaskHead, TxList, requestText } from './shared'
@@ -288,6 +288,21 @@ export function ChildGoals({ meId }: { meId: number }) {
   const [target, setTarget] = useState('')
   const [dep, setDep] = useState<{ id: number; title: string; percent: number } | null>(null)
   const [sum, setSum] = useState('')
+  // Плашка, когда бонус родителя вошёл в накопления (сразу при взносе или после подтверждения)
+  const bonusTotal = data ? data.items.reduce((s, g) => s + (g.bonus_cents ?? 0), 0) : null
+  const seenBonus = useRef<number | null>(null)
+  useEffect(() => {
+    if (bonusTotal === null) return
+    const key = `bonusSeen:${meId}`
+    if (seenBonus.current === null) {
+      try { const v = localStorage.getItem(key); if (v !== null) seenBonus.current = Number(v) } catch { /* хранилище недоступно */ }
+    }
+    if (seenBonus.current !== null && bonusTotal > seenBonus.current) {
+      bonusBanner('Поступил бонус от родителя', `+ ${money(bonusTotal - seenBonus.current)} добавлено к накоплениям`)
+    }
+    seenBonus.current = bonusTotal
+    try { localStorage.setItem(key, String(bonusTotal)) } catch { /* ничего страшного */ }
+  }, [bonusTotal, meId])
   if (!data) return <><Header title="Мои цели" /><Loading /></>
   const saved = data.items.reduce((s, g) => s + g.saved_cents, 0)
   return (
@@ -335,6 +350,7 @@ export function ChildGoals({ meId }: { meId: number }) {
               <Note icon="gift">
                 {left <= 0
                   ? 'Бонус родителя в этом месяце закончился, взнос пройдёт без него'
+                  : bonus >= 1000 ? `Бонус +${money(bonus)} крупный — его должен подтвердить родитель`
                   : bonus > 0 ? `Родитель добавит +${money(bonus)} (бонус +${dep.percent}%)` : `Родитель добавит +${dep.percent}% к каждому взносу`}
               </Note>
             )
@@ -344,7 +360,8 @@ export function ChildGoals({ meId }: { meId: number }) {
             if (!dep || !(c > 0)) { toast('Укажите сумму'); return }
             const r = await api.depositGoal(dep.id, c)
             setDep(null); setSum(''); await reload()
-            toast(r.bonus_cents > 0 ? `Отложено + ${money(r.bonus_cents)} бонус от родителя` : 'Отложено')
+            if (r.bonus_pending_cents > 0) bonusBanner('Бонус ждёт родителя', `+ ${money(r.bonus_pending_cents)} — родитель должен подтвердить`)
+            else if (r.bonus_cents <= 0) toast('Отложено')
           }}>Отложить с карты</Btn>
         </div>
       </Sheet>

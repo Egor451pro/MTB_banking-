@@ -533,7 +533,7 @@ function GoalsParent({ childId }: { childId: number }) {
         <GoalCard key={g.id} g={g}>
           <div className="mb-2 text-[13px] font-medium text-muted">Ваш бонус к накоплениям</div>
           <Segmented<number>
-            options={[{ id: 0, label: 'Нет' }, { id: 5, label: '+5%' }, { id: 10, label: '+10%' }, { id: 20, label: '+20%' }]}
+            options={[{ id: 0, label: 'Нет' }, { id: 5, label: '+5%' }, { id: 10, label: '+10%' }, { id: 20, label: '+20%' }, { id: 50, label: '+50%' }]}
             value={g.parent_bonus_percent}
             onChange={async (p) => { await api.setGoalBonus(g.id, p); await reload() }}
           />
@@ -547,16 +547,44 @@ function GoalsParent({ childId }: { childId: number }) {
 export function ParentRequests() {
   const { data, reload } = useData(() => api.listRequests(), [], 3000)
   const pp = useData(() => api.listPendingPurchases(), [], 3000)
+  const pb = useData(() => api.listPendingBonuses(), [], 3000)
   if (!data) return <><Header title="Запросы" /><Loading /></>
   const pending = data.items.filter((r) => r.status === 'pending')
   const done = data.items.filter((r) => r.status !== 'pending')
   const purchases = pp.data?.items ?? []
-  const total = pending.length + purchases.length
+  const bonuses = pb.data?.items ?? []
+  const total = pending.length + purchases.length + bonuses.length
   return (
     <>
       <Header title="Запросы" subtitle={total ? `${total} ${plural(total, 'ждёт', 'ждут', 'ждут')} решения` : 'Всё рассмотрено'} />
       <div className="space-y-5 p-4">
         {!total && <Empty text="Новых запросов нет" />}
+
+        {bonuses.length > 0 && (
+          <Section title="Подтвердить бонус">
+            {bonuses.map((b) => (
+              <Card key={b.id}>
+                <div className="flex items-center gap-3">
+                  <Avatar name={b.child_name} size={36} />
+                  <div className="min-w-0 flex-1">
+                    <div className="text-[15px] font-semibold text-mt-ink">{b.child_name}</div>
+                    <div className="text-xs text-muted">{dateTime(b.created_at)}</div>
+                  </div>
+                  <Badge tone="sky"><Icon name="gift" size={14} />Бонус</Badge>
+                </div>
+                <div className="mt-3 flex items-baseline justify-between gap-3">
+                  <div className="min-w-0 truncate text-[17px] font-semibold text-mt-ink">Цель «{b.goal_title}»</div>
+                  <div className="shrink-0 text-xl font-bold tabular-nums text-mt-ink">+ {money(b.amount_cents)}</div>
+                </div>
+                <div className="text-[13px] text-muted">Крупный бонус добавится в накопления после вашего подтверждения</div>
+                <div className="mt-4 grid grid-cols-2 gap-2">
+                  <Btn small tone="danger" onClick={async () => { await api.rejectBonus(b.id); await pb.reload(); toast('Бонус отклонён') }}>Отклонить</Btn>
+                  <Btn small onClick={async () => { await api.approveBonus(b.id); await pb.reload(); toast('Бонус добавлен в накопления') }}>Подтвердить</Btn>
+                </div>
+              </Card>
+            ))}
+          </Section>
+        )}
 
         {purchases.length > 0 && (
           <Section title="Подтвердить покупку">
@@ -584,7 +612,7 @@ export function ParentRequests() {
           </Section>
         )}
 
-        {pending.length > 0 && purchases.length > 0 && <h2 className="px-1 text-[22px] font-bold tracking-tight text-mt-ink">Запросы детей</h2>}
+        {pending.length > 0 && purchases.length + bonuses.length > 0 && <h2 className="px-1 text-[22px] font-bold tracking-tight text-mt-ink">Запросы детей</h2>}
         {pending.map((r) => (
           <Card key={r.id}>
             <div className="flex items-center gap-3">

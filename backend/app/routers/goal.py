@@ -11,7 +11,8 @@ from app.models import User
 from app.schemas.goal import (
     GoalsListResponse, CreateGoalRequest, CreateGoalResponse,
     DepositGoalRequest, DepositGoalResponse,
-    SetBonusRequest, SetBonusResponse
+    SetBonusRequest, SetBonusResponse,
+    PendingBonusesResponse, BonusDecisionResponse,
 )
 from app.services.goal_service import GoalService
 
@@ -91,3 +92,30 @@ async def set_goal_bonus(
         bonus_percent=request.parent_bonus_percent,
         db=db
     )
+
+
+@router.get("/bonuses/pending", response_model=PendingBonusesResponse)
+async def list_pending_bonuses(
+    parent: Annotated[User, Depends(require_parent)],
+    db: AsyncSession = Depends(get_db)
+):
+    """GET /bonuses/pending — крупные бонусы, ждущие подтверждения родителя."""
+    return await GoalService.list_pending_bonuses(parent=parent, db=db)
+
+
+@router.post("/bonuses/{bonus_id}/approve", response_model=BonusDecisionResponse)
+async def approve_bonus(
+    bonus_id: int,
+    parent: Annotated[User, Depends(require_parent)],
+    db: AsyncSession = Depends(get_db)
+):
+    return await GoalService.decide_bonus(parent=parent, bonus_id=bonus_id, approve=True, db=db)
+
+
+@router.post("/bonuses/{bonus_id}/reject", response_model=BonusDecisionResponse)
+async def reject_bonus(
+    bonus_id: int,
+    parent: Annotated[User, Depends(require_parent)],
+    db: AsyncSession = Depends(get_db)
+):
+    return await GoalService.decide_bonus(parent=parent, bonus_id=bonus_id, approve=False, db=db)

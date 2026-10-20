@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { api, session, usingMock } from './api'
 import { NavProvider, useNav } from './nav'
-import { BottomNav, ToastHost, Loading, type TabDef } from './ui'
+import { BonusBannerHost, BottomNav, ToastHost, Loading, type TabDef } from './ui'
 import { useData } from './hooks'
 import type { Me } from './types'
 import { ChildGoals, ChildHome, ChildLevel, ChildPay, ChildTasks, LessonScreen, RequestScreen } from './screens/child'
@@ -18,7 +18,8 @@ function ParentShell() {
   const { tab, setTab, stack, back } = useNav()
   const fam = useData(() => api.getFamily(), [], 3000)
   const pp = useData(() => api.listPendingPurchases(), [], 3000)
-  const pending = (fam.data?.children.reduce((s, c) => s + c.pending_requests, 0) ?? 0) + (pp.data?.items.length ?? 0)
+  const pb = useData(() => api.listPendingBonuses(), [], 3000)
+  const pending = (fam.data?.children.reduce((s, c) => s + c.pending_requests, 0) ?? 0) + (pp.data?.items.length ?? 0) + (pb.data?.items.length ?? 0)
   const tabs: TabDef[] = [
     { id: 'home', label: 'Главная', icon: 'home' },
     { id: 'products', label: 'Продукты', icon: 'card' },
@@ -111,6 +112,7 @@ export default function App() {
       </div>
       <div className="relative flex h-[calc(100dvh-52px)] w-full flex-col overflow-hidden bg-[#EDEFF3] sm:h-[min(820px,calc(100dvh-90px))] sm:max-w-[400px] sm:rounded-[36px] sm:border-[7px] sm:border-mt-ink sm:shadow-2xl">
         <ToastHost />
+        <BonusBannerHost />
         <Phone key={uid} uid={uid} />
       </div>
     </div>

@@ -14,6 +14,39 @@ const GRAD = 'bg-gradient-to-b from-[#3D74EC] to-[#2B5FDB]'
 // ───────── Уведомление ─────────
 export const toast = (msg: string) => window.dispatchEvent(new CustomEvent('app-toast', { detail: msg }))
 
+// Крупная плашка с иконкой: «Поступил бонус от родителя»
+export const bonusBanner = (title: string, text: string) =>
+  window.dispatchEvent(new CustomEvent('app-bonus', { detail: { title, text } }))
+
+export function BonusBannerHost() {
+  const [b, setB] = useState<{ title: string; text: string; id: number; leaving: boolean } | null>(null)
+  useEffect(() => {
+    let t: ReturnType<typeof setTimeout>, t2: ReturnType<typeof setTimeout>
+    const h = (e: Event) => {
+      clearTimeout(t); clearTimeout(t2)
+      const d = (e as CustomEvent<{ title: string; text: string }>).detail
+      setB({ ...d, id: Date.now(), leaving: false })
+      t = setTimeout(() => setB((m) => (m ? { ...m, leaving: true } : m)), 4600)
+      t2 = setTimeout(() => setB(null), 4850)
+    }
+    window.addEventListener('app-bonus', h)
+    return () => { window.removeEventListener('app-bonus', h); clearTimeout(t); clearTimeout(t2) }
+  }, [])
+  if (!b) return null
+  return (
+    <div
+      key={b.id} role="status" onClick={() => setB(null)}
+      className={`absolute inset-x-3 top-3 z-50 flex items-center gap-3 rounded-2xl bg-white px-4 py-3 shadow-xl ring-1 ring-black/5 ${b.leaving ? 'anim-toast-out' : 'anim-toast'}`}
+    >
+      <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-mt-blue text-white"><Icon name="gift" size={22} /></span>
+      <span className="min-w-0">
+        <span className="block text-[15px] font-bold text-mt-ink">{b.title}</span>
+        <span className="block text-[13px] text-muted">{b.text}</span>
+      </span>
+    </div>
+  )
+}
+
 export function ToastHost() {
   const [msg, setMsg] = useState<{ text: string; id: number; leaving: boolean } | null>(null)
   useEffect(() => {

@@ -111,23 +111,7 @@ export interface Goal {
   target_cents: number
   saved_cents: number
   parent_bonus_percent: number
-  bonus_cents?: number   // сколько бонуса родителя уже вошло в накопления
   status: 'active' | 'done'
-}
-
-// Результат взноса в цель: бонус родителя начисляется сразу, но не больше месячного лимита
-export interface DepositResult {
-  saved_cents: number
-  card_balance_cents: number
-  bonus_cents: number        // бонус за этот взнос
-  bonus_left_cents: number   // остаток лимита бонуса на месяц
-  status: string
-}
-
-export interface GoalsResp {
-  items: Goal[]
-  bonus_month_cap_cents: number
-  bonus_month_left_cents: number
 }
 
 export interface Task {

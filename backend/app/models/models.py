@@ -202,6 +202,8 @@ class GoalBonus(Base):
     goal_id: Mapped[int] = mapped_column(ForeignKey("goals.id"), nullable=False)
     child_id: Mapped[int] = mapped_column(ForeignKey("users.id"), nullable=False)
     amount_cents: Mapped[int] = mapped_column(Integer, nullable=False)
+    # credited — уже в накоплениях; pending — крупный бонус ждёт подтверждения родителя; rejected — отклонён
+    status: Mapped[str] = mapped_column(String(16), default="credited", nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
 
 

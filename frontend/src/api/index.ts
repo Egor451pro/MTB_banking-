@@ -1,6 +1,6 @@
 import type {
   AccessRequest, Allowance, ApproveResult, Category, ChildDetail, DepositResult, FamilyResp, Goal, GoalsResp, Lesson, LessonResult,
-  LevelInfo, LimitItem, LoyaltyInfo, Me, PackageReq, PayRequest, PayResult, PendingPurchase, Permission,
+  LevelInfo, LimitItem, LoyaltyInfo, Me, PackageReq, PayRequest, PayResult, PendingPurchase, PendingBonus, BonusDecision, Permission,
   PermissionKey, ReqStatus, ReqType, Task, Transaction,
 } from '../types'
 import { realApi } from './real'
@@ -41,6 +41,9 @@ export interface Api {
 
   // Подтверждение покупок родителем
   listPendingPurchases(): Promise<{ items: PendingPurchase[] }>
+  listPendingBonuses(): Promise<{ items: PendingBonus[] }>
+  approveBonus(id: number): Promise<BonusDecision>
+  rejectBonus(id: number): Promise<BonusDecision>
   approvePurchase(txId: number): Promise<ApproveResult>
   declinePurchase(txId: number): Promise<ApproveResult>
   // Карманные деньги

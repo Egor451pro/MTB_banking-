@@ -12,12 +12,15 @@ from typing import List
 from app.models import Goal, GoalBonus, GoalStatus, User, Account
 from app.schemas.goal import (
     GoalItem, GoalsListResponse, CreateGoalResponse,
-    DepositGoalResponse, SetBonusResponse
+    DepositGoalResponse, SetBonusResponse,
+    PendingBonusItem, PendingBonusesResponse, BonusDecisionResponse,
 )
 
 
 # Бонус родителя начисляется при каждом взносе, но не больше этой суммы в месяц на ребёнка
 MONTHLY_BONUS_CAP_CENTS = 1000
+# Бонус за один взнос от этой суммы не начисляется сам — его подтверждает родитель
+BONUS_CONFIRM_CENTS = 1000
 
 
 def _month_start_utc() -> datetime:
@@ -32,6 +35,7 @@ async def _bonus_spent_this_month(child_id: int, db: AsyncSession) -> int:
     result = await db.execute(
         select(func.coalesce(func.sum(GoalBonus.amount_cents), 0)).where(
             GoalBonus.child_id == child_id,
+            GoalBonus.status != "rejected",
             GoalBonus.created_at >= _month_start_utc(),
         )
     )
@@ -54,7 +58,7 @@ class GoalService:
 
         bonus_rows = await db.execute(
             select(GoalBonus.goal_id, func.sum(GoalBonus.amount_cents))
-            .where(GoalBonus.child_id == child_id)
+            .where(GoalBonus.child_id == child_id, GoalBonus.status == "credited")
             .group_by(GoalBonus.goal_id)
         )
         bonus_by_goal = {goal_id: int(total) for goal_id, total in bonus_rows.all()}
@@ -187,11 +191,18 @@ class GoalService:
         if goal.parent_bonus_percent > 0:
             bonus = min(amount_cents * goal.parent_bonus_percent // 100, bonus_left)
 
-        # Списываем с карты и добавляем в цель (вместе с бонусом)
+        # Крупный бонус ждёт подтверждения родителя, обычный начисляется сразу
+        needs_confirm = bonus >= BONUS_CONFIRM_CENTS
+        credited = 0 if needs_confirm else bonus
+
+        # Списываем с карты и добавляем в цель
         account.balance_cents -= amount_cents
-        goal.saved_cents += amount_cents + bonus
+        goal.saved_cents += amount_cents + credited
         if bonus > 0:
-            db.add(GoalBonus(goal_id=goal.id, child_id=child.id, amount_cents=bonus))
+            db.add(GoalBonus(
+                goal_id=goal.id, child_id=child.id, amount_cents=bonus,
+                status="pending" if needs_confirm else "credited",
+            ))
         
         # Если цель достигнута, меняем статус
         if goal.saved_cents >= goal.target_cents:
@@ -202,7 +213,8 @@ class GoalService:
         return DepositGoalResponse(
             saved_cents=goal.saved_cents,
             card_balance_cents=account.balance_cents,
-            bonus_cents=bonus,
+            bonus_cents=credited,
+            bonus_pending_cents=bonus if needs_confirm else 0,
             bonus_left_cents=bonus_left - bonus,
             status=goal.status.value
         )
@@ -247,3 +259,46 @@ class GoalService:
         await db.flush()
         
         return SetBonusResponse(parent_bonus_percent=goal.parent_bonus_percent)
+
+
+    @staticmethod
+    async def list_pending_bonuses(parent: User, db: AsyncSession) -> PendingBonusesResponse:
+        """GET /bonuses/pending — крупные бонусы семьи, ждущие подтверждения."""
+        rows = (await db.execute(
+            select(GoalBonus, Goal, User)
+            .join(Goal, Goal.id == GoalBonus.goal_id)
+            .join(User, User.id == GoalBonus.child_id)
+            .where(GoalBonus.status == "pending", User.family_id == parent.family_id)
+            .order_by(GoalBonus.created_at.desc())
+        )).all()
+        return PendingBonusesResponse(items=[
+            PendingBonusItem(
+                id=b.id, child_id=c.id, child_name=c.name, goal_title=g.title,
+                amount_cents=b.amount_cents, created_at=b.created_at,
+            )
+            for b, g, c in rows
+        ])
+
+    @staticmethod
+    async def decide_bonus(parent: User, bonus_id: int, approve: bool, db: AsyncSession) -> BonusDecisionResponse:
+        """POST /bonuses/{id}/approve | reject"""
+        row = (await db.execute(
+            select(GoalBonus, Goal, User)
+            .join(Goal, Goal.id == GoalBonus.goal_id)
+            .join(User, User.id == GoalBonus.child_id)
+            .where(GoalBonus.id == bonus_id)
+        )).first()
+        if not row or row[2].family_id != parent.family_id:
+            raise HTTPException(status_code=404, detail={"error": "not_found", "message": "Бонус не найден"})
+        bonus, goal, _child = row
+        if bonus.status != "pending":
+            raise HTTPException(status_code=409, detail={"error": "conflict", "message": "Бонус уже обработан"})
+        if approve:
+            bonus.status = "credited"
+            goal.saved_cents += bonus.amount_cents
+            if goal.saved_cents >= goal.target_cents:
+                goal.status = GoalStatus.DONE
+        else:
+            bonus.status = "rejected"
+        await db.flush()
+        return BonusDecisionResponse(id=bonus.id, status=bonus.status, saved_cents=goal.saved_cents)
