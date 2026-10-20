@@ -10,6 +10,7 @@ from .demo_service import DemoService
 from .card_service import CardService
 from .permission_service import PermissionService
 from .allowance_service import AllowanceService
+from .lesson_service import LessonService
 
 __all__ = [
     "UserService",
@@ -24,4 +25,5 @@ __all__ = [
     "CardService",
     "PermissionService",
     "AllowanceService",
+    "LessonService",
 ]
