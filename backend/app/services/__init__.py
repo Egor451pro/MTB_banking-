@@ -7,6 +7,7 @@ from .request_service import RequestService
 from .task_service import TaskService
 from .transaction_service import TransactionService
 from .demo_service import DemoService
+from .card_service import CardService
 
 __all__ = [
     "UserService",
@@ -18,4 +19,5 @@ __all__ = [
     "TaskService",
     "TransactionService",
     "DemoService",
+    "CardService",
 ]
