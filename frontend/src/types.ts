@@ -183,6 +183,7 @@ export interface VirtualCard {
   expires: string | null
   cvc: string | null
   status: 'active' | 'frozen' | null
+  balance_cents: number              // свой баланс карты
   plastic: { status: 'none' | 'ordered' | 'ready'; method: 'pickup' | 'delivery' | null; address: string | null; ordered_at: string | null }
   plastic_price_cents: number
   courier_fee_cents: number

@@ -50,6 +50,7 @@ export interface Api {
   issueVirtualCard(childId: number, holder?: string): Promise<VirtualCard>
   setVirtualCardStatus(childId: number, status: 'active' | 'frozen'): Promise<VirtualCard>
   orderPlastic(childId: number, method: 'pickup' | 'delivery', address?: string): Promise<VirtualCard>
+  transferVirtualCard(childId: number, direction: 'to_card' | 'to_account', amountCents: number): Promise<VirtualCard>
 
   getBeaver(childId: number): Promise<BeaverSave>
   putBeaver(childId: number, data: Record<string, unknown>, updatedAt: number): Promise<BeaverSave>

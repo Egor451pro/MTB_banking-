@@ -21,6 +21,11 @@ class StatusRequest(BaseModel):
     status: Literal["active", "frozen"]
 
 
+class TransferRequest(BaseModel):
+    direction: Literal["to_card", "to_account"]
+    amount_cents: int
+
+
 class PlasticRequest(BaseModel):
     method: Literal["pickup", "delivery"]
     address: Optional[str] = None
@@ -76,3 +81,15 @@ async def order_plastic(
 ):
     _own(child, child_id)
     return await VirtualCardService.order_plastic(child, body.method, body.address, db)
+
+
+@router.post("/children/{child_id}/virtual-card/transfer", response_model=VirtualCardResponse)
+async def transfer_virtual_card(
+    child_id: int,
+    body: TransferRequest,
+    child: Annotated[User, Depends(require_child)],
+    db: AsyncSession = Depends(get_db),
+):
+    """Перевод со счёта на виртуальную карту и обратно (только сам ребёнок)."""
+    _own(child, child_id)
+    return await VirtualCardService.transfer(child, body.direction, body.amount_cents, db)

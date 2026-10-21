@@ -104,3 +104,50 @@ async def test_delivery_needs_address(client: AsyncClient, seed_test_data, db_se
     await client.post(f"/children/{teen}/virtual-card", headers=h(teen), json={})
     r = await client.post(f"/children/{teen}/virtual-card/plastic", headers=h(teen), json={"method": "delivery"})
     assert r.status_code == 400
+
+
+@pytest.mark.asyncio
+async def test_transfer_to_card_and_back(client: AsyncClient, seed_test_data, db_session):
+    teen = await _teen(db_session, balance_cents=3000)
+    await client.post(f"/children/{teen}/virtual-card", headers=h(teen), json={})
+
+    r = await client.post(f"/children/{teen}/virtual-card/transfer", headers=h(teen),
+                          json={"direction": "to_card", "amount_cents": 1000})
+    assert r.status_code == 200
+    assert r.json()["balance_cents"] == 1000
+    me = await client.get(f"/children/{teen}", headers=h(teen))
+    assert me.json()["card"]["balance_cents"] == 2000
+    # перевод себе не расходует дневной лимит
+    assert me.json()["limits_today"]["spent_cents"] == 0
+
+    back = await client.post(f"/children/{teen}/virtual-card/transfer", headers=h(teen),
+                             json={"direction": "to_account", "amount_cents": 400})
+    assert back.json()["balance_cents"] == 600
+    me = await client.get(f"/children/{teen}", headers=h(teen))
+    assert me.json()["card"]["balance_cents"] == 2400
+
+
+@pytest.mark.asyncio
+async def test_transfer_checks_funds(client: AsyncClient, seed_test_data, db_session):
+    teen = await _teen(db_session, balance_cents=500)
+    await client.post(f"/children/{teen}/virtual-card", headers=h(teen), json={})
+    r = await client.post(f"/children/{teen}/virtual-card/transfer", headers=h(teen),
+                          json={"direction": "to_card", "amount_cents": 1000})
+    assert r.status_code == 400 and r.json()["error"] == "insufficient_funds"
+    r = await client.post(f"/children/{teen}/virtual-card/transfer", headers=h(teen),
+                          json={"direction": "to_account", "amount_cents": 100})
+    assert r.status_code == 400 and r.json()["error"] == "insufficient_funds"
+    r = await client.post(f"/children/{teen}/virtual-card/transfer", headers=h(teen),
+                          json={"direction": "to_card", "amount_cents": 0})
+    assert r.status_code == 400
+
+
+@pytest.mark.asyncio
+async def test_parent_cannot_transfer(client: AsyncClient, seed_test_data, db_session):
+    teen = await _teen(db_session)
+    await client.post(f"/children/{teen}/virtual-card", headers=h(teen), json={})
+    parent = seed_test_data["family1_parent_id"]
+    r = await client.post(f"/children/{teen}/virtual-card/transfer", headers=h(parent),
+                          json={"direction": "to_card", "amount_cents": 100})
+    assert r.status_code == 403
+

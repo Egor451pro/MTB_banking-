@@ -3,7 +3,7 @@
 """
 from fastapi import HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, func
+from sqlalchemy import select, func, or_
 from datetime import date, datetime
 from typing import Optional
 import pytz
@@ -86,6 +86,8 @@ class UserService:
             Transaction.direction == TransactionDirection.OUT,
             Transaction.status == TransactionStatus.APPROVED,
             Transaction.created_at >= start_of_day_utc,
+            # переводы между счётом и виртуальной картой — свои деньги, это не трата
+            or_(Transaction.merchant.is_(None), Transaction.merchant != "Перевод на виртуальную карту"),
         ]
         if category is not None:
             filters.append(Transaction.category == category)

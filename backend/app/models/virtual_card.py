@@ -17,6 +17,8 @@ class VirtualCard(Base):
     expires: Mapped[str] = mapped_column(String(5), nullable=False)  # MM/YY
     cvc: Mapped[str] = mapped_column(String(3), nullable=False)
     status: Mapped[str] = mapped_column(String(10), default="active")  # active | frozen
+    # Свой баланс карты: деньги переводятся со счёта ребёнка и обратно
+    balance_cents: Mapped[int] = mapped_column(Integer, default=0, server_default="0", nullable=False)
     # Пластик: пока plastic_ordered_at пустой, пластик не заказывали
     plastic_method: Mapped[Optional[str]] = mapped_column(String(10), nullable=True)  # pickup | delivery
     plastic_address: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)

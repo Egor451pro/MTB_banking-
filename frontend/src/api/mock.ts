@@ -169,7 +169,7 @@ export function mockApi(): Api {
   // Бобёр: то же правило, что на сервере: побеждает более новое состояние
   let beavers: Record<number, { data: Record<string, unknown>; updated_at: number }> = {}
   // Виртуальные карты подростков (на сервере это таблица virtual_cards)
-  interface VCardRow { holder: string; number: string; expires: string; cvc: string; status: 'active' | 'frozen'; method: 'pickup' | 'delivery' | null; address: string | null; orderedAt: number | null }
+  interface VCardRow { balance: number; holder: string; number: string; expires: string; cvc: string; status: 'active' | 'frozen'; method: 'pickup' | 'delivery' | null; address: string | null; orderedAt: number | null }
   let vcards: Record<number, VCardRow> = {}
   const PLASTIC_PRICE = 1500, COURIER_FEE = 500, PLASTIC_READY_MS = 60_000
   const luhnNumber = () => {
@@ -238,12 +238,12 @@ export function mockApi(): Api {
     const locked = p?.locked_reason ?? (p?.enabled ? null : 'Родитель ещё не разрешил виртуальную карту')
     const v = vcards[childId]
     const base = { available: !locked, locked_reason: locked, plastic_price_cents: PLASTIC_PRICE, courier_fee_cents: COURIER_FEE }
-    if (!v) return { ...base, issued: false, holder: null, number: null, last4: null, expires: null, cvc: null, status: null, plastic: { status: 'none', method: null, address: null, ordered_at: null } }
+    if (!v) return { ...base, issued: false, holder: null, number: null, last4: null, expires: null, cvc: null, status: null, balance_cents: 0, plastic: { status: 'none', method: null, address: null, ordered_at: null } }
     const age = v.orderedAt ? Date.now() - v.orderedAt : 0
     return {
       ...base, issued: true, holder: v.holder,
       number: owner ? v.number : `•••• •••• •••• ${v.number.slice(-4)}`,
-      last4: v.number.slice(-4), expires: owner ? v.expires : null, cvc: owner ? v.cvc : null, status: v.status,
+      last4: v.number.slice(-4), expires: owner ? v.expires : null, cvc: owner ? v.cvc : null, status: v.status, balance_cents: v.balance,
       plastic: { status: !v.orderedAt ? 'none' : age >= PLASTIC_READY_MS ? 'ready' : 'ordered', method: v.method, address: v.address, ordered_at: v.orderedAt ? new Date(v.orderedAt).toISOString() : null },
     }
   }
@@ -280,6 +280,7 @@ export function mockApi(): Api {
   const spentToday = (accId: number, category?: Category | null) =>
     db.txs
       .filter((t) => t.account_id === accId && t.direction === 'out' && t.status === 'approved'
+        && t.merchant !== 'Перевод на виртуальную карту'   // перевод себе не трата
         && new Date(t.created_at).getTime() >= startOfToday()
         && (category === undefined || t.category === category))
       .reduce((s, t) => s + t.amount_cents, 0)
@@ -630,7 +631,7 @@ export function mockApi(): Api {
         vcards[childId] = {
           holder: name, number: luhnNumber(), cvc: String(Math.floor(Math.random() * 1000)).padStart(3, '0'),
           expires: `${String(now.getMonth() + 1).padStart(2, '0')}/${String((now.getFullYear() + 4) % 100).padStart(2, '0')}`,
-          status: 'active', method: null, address: null, orderedAt: null,
+          status: 'active', balance: 0, method: null, address: null, orderedAt: null,
         }
       }
       return delay(vcardView(childId))
@@ -640,6 +641,27 @@ export function mockApi(): Api {
       access(childId)
       if (!vcards[childId]) throw new MockError('not_found', 'Виртуальная карта ещё не выпущена')
       vcards[childId].status = status
+      return delay(vcardView(childId))
+    },
+
+    async transferVirtualCard(childId, direction, amountCents) {
+      const c = requireChild()
+      if (c.id !== childId) throw new MockError('forbidden', 'Нет доступа к профилю другого пользователя')
+      const v = vcards[childId]
+      if (!v) throw new MockError('not_found', 'Сначала выпустите виртуальную карту')
+      if (!Number.isInteger(amountCents) || amountCents <= 0 || amountCents > 1_000_000) throw new MockError('validation_error', 'Укажите сумму перевода')
+      const a = card(childId)
+      if (a.status === 'blocked') throw new MockError('card_blocked', 'Карта заблокирована')
+      const row = { id: ++db.seq.tx, account_id: a.id, amount_cents: amountCents, category: null, status: 'approved' as const, decline_reason: null, created_at: new Date().toISOString() }
+      if (direction === 'to_card') {
+        if (a.balance_cents < amountCents) throw new MockError('insufficient_funds', `На счёте не хватает денег: доступно ${rub(a.balance_cents)}`)
+        a.balance_cents -= amountCents; v.balance += amountCents
+        db.txs.push({ ...row, direction: 'out', merchant: 'Перевод на виртуальную карту' })
+      } else {
+        if (v.balance < amountCents) throw new MockError('insufficient_funds', `На карте не хватает денег: доступно ${rub(v.balance)}`)
+        v.balance -= amountCents; a.balance_cents += amountCents
+        db.txs.push({ ...row, direction: 'in', merchant: 'Перевод с виртуальной карты' })
+      }
       return delay(vcardView(childId))
     },
 

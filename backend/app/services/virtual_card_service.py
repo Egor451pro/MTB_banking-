@@ -15,6 +15,9 @@ from app.services.permission_service import PermissionService
 
 PLASTIC_PRICE_CENTS = 1500   # 15 BYN, как перевыпуск карты по тарифам банка
 COURIER_FEE_CENTS = 500      # доставка курьером
+TRANSFER_TO_CARD = "Перевод на виртуальную карту"
+TRANSFER_FROM_CARD = "Перевод с виртуальной карты"
+MAX_TRANSFER_CENTS = 1_000_000
 PLASTIC_READY_SECONDS = 60   # в демо «изготовление» занимает минуту
 
 
@@ -35,6 +38,7 @@ class VirtualCardResponse(BaseModel):
     expires: Optional[str] = None
     cvc: Optional[str] = None             # только владельцу
     status: Optional[str] = None
+    balance_cents: int = 0                # свой баланс карты
     plastic: PlasticInfo
     plastic_price_cents: int = PLASTIC_PRICE_CENTS
     courier_fee_cents: int = COURIER_FEE_CENTS
@@ -100,6 +104,7 @@ class VirtualCardService:
             expires=card.expires if owner else None,
             cvc=card.cvc if owner else None,
             status=card.status,
+            balance_cents=card.balance_cents or 0,
             plastic=_plastic(card),
         )
 
@@ -133,6 +138,50 @@ class VirtualCardService:
         card.status = status
         await db.flush()
         return await VirtualCardService.get(child, viewer, db)
+
+    @staticmethod
+    async def transfer(
+        child: User, direction: str, amount_cents: int, db: AsyncSession
+    ) -> VirtualCardResponse:
+        """Перевод между счётом ребёнка и его виртуальной картой. Это свои деньги, лимиты трат не расходуются."""
+        card = await db.get(VirtualCard, child.id)
+        if card is None:
+            raise _fail(404, "not_found", "Сначала выпустите виртуальную карту")
+        if amount_cents <= 0 or amount_cents > MAX_TRANSFER_CENTS:
+            raise _fail(400, "validation_error", "Укажите сумму перевода")
+        account = (await db.execute(select(Account).where(Account.owner_id == child.id))).scalar_one_or_none()
+        if account is None:
+            raise _fail(404, "not_found", "Карта не найдена")
+        if account.status == AccountStatus.BLOCKED:
+            raise _fail(403, "card_blocked", "Карта заблокирована")
+
+        if direction == "to_card":
+            if account.balance_cents < amount_cents:
+                raise _fail(400, "insufficient_funds", f"На счёте не хватает денег: доступно {_money(account.balance_cents)}")
+            account.balance_cents -= amount_cents
+            card.balance_cents = (card.balance_cents or 0) + amount_cents
+            tx_direction, merchant = TransactionDirection.OUT, TRANSFER_TO_CARD
+        else:
+            if (card.balance_cents or 0) < amount_cents:
+                raise _fail(400, "insufficient_funds", f"На карте не хватает денег: доступно {_money(card.balance_cents or 0)}")
+            card.balance_cents -= amount_cents
+            account.balance_cents += amount_cents
+            tx_direction, merchant = TransactionDirection.IN, TRANSFER_FROM_CARD
+
+        db.add(
+            Transaction(
+                account_id=account.id,
+                amount_cents=amount_cents,
+                direction=tx_direction,
+                category=None,
+                merchant=merchant,
+                is_online=False,
+                status=TransactionStatus.APPROVED,
+                decline_reason=None,
+            )
+        )
+        await db.flush()
+        return await VirtualCardService.get(child, child, db)
 
     @staticmethod
     async def order_plastic(

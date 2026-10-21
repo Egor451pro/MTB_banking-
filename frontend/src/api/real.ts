@@ -64,6 +64,7 @@ export function realApi(base: string): Api {
     issueVirtualCard: (id, holder) => post(`/children/${id}/virtual-card`, { holder }),
     setVirtualCardStatus: (id, status) => post(`/children/${id}/virtual-card/status`, { status }),
     orderPlastic: (id, method, address) => post(`/children/${id}/virtual-card/plastic`, { method, address }),
+    transferVirtualCard: (id, direction, amount_cents) => post(`/children/${id}/virtual-card/transfer`, { direction, amount_cents }),
     getBeaver: (id) => get(`/children/${id}/beaver`),
     putBeaver: (id, data, updated_at) => put(`/children/${id}/beaver`, { data, updated_at }),
 

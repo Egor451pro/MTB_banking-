@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { api } from '../api'
-import { dateTime, money } from '../format'
+import { dateTime, money, toCents } from '../format'
 import { useData } from '../hooks'
 import { Icon } from '../icons'
 import { useNav } from '../nav'
@@ -9,8 +9,7 @@ import type { VirtualCard } from '../types'
 import '../beaver.css'
 
 // Виртуальная карта подростка (14–17 лет): выпуск в приложении, данные карты, заморозка,
-// заказ пластиковой карты за деньги со счёта. Карта привязана к тому же счёту, поэтому лимиты,
-// запреты и баланс те же, что у основной карты.
+// отдельный баланс с переводами со счёта и обратно, заказ пластиковой карты за деньги со счёта.
 
 const groups = (n: string) => n.replace(/\D/g, '').replace(/(.{4})/g, '$1 ').trim()
 
@@ -59,6 +58,9 @@ export function VirtualCardScreen({ meId, ageGroup }: { meId: number; ageGroup: 
   const [plastic, setPlastic] = useState(false)
   const [method, setMethod] = useState<'pickup' | 'delivery'>('pickup')
   const [address, setAddress] = useState('')
+  const [xfer, setXfer] = useState(false)
+  const [dir, setDir] = useState<'to_card' | 'to_account'>('to_card')
+  const [amount, setAmount] = useState('')
 
   useEffect(() => {
     if (!shownUntil) return
@@ -95,6 +97,18 @@ export function VirtualCardScreen({ meId, ageGroup }: { meId: number; ageGroup: 
     } catch (e) { toast((e as Error).message) }
   }
 
+  const fromCents = dir === 'to_card' ? c.card.balance_cents : v.balance_cents
+  const amountCents = toCents(amount)
+  const xferOk = amountCents > 0 && amountCents <= fromCents
+  const transfer = async () => {
+    try {
+      await api.transferVirtualCard(meId, dir, amountCents)
+      setXfer(false); setAmount('')
+      await Promise.all([vc.reload(), me.reload()])
+      toast(dir === 'to_card' ? `${money(amountCents)} переведено на карту` : `${money(amountCents)} переведено на счёт`)
+    } catch (e) { toast((e as Error).message) }
+  }
+
   // ── не выпущена ──
   if (!v.issued) {
     return (
@@ -105,7 +119,7 @@ export function VirtualCardScreen({ meId, ageGroup }: { meId: number; ageGroup: 
           {v.available ? (
             <Card className="space-y-4">
               <Field label="Имя на карте" value={holder} onChange={setHolder} placeholder={c.name} />
-              <p className="text-[13px] text-muted">Выпуск бесплатный. Карта привязана к твоему счёту, лимиты и запреты родителя действуют и на ней.</p>
+              <p className="text-[13px] text-muted">Выпуск бесплатный. У карты свой баланс: переводи на неё деньги со счёта, когда нужно, и обратно.</p>
               <Btn icon="card-plus" onClick={issue}>Выпустить карту</Btn>
             </Card>
           ) : (
@@ -150,12 +164,18 @@ export function VirtualCardScreen({ meId, ageGroup }: { meId: number; ageGroup: 
           </Card>
         )}
 
-        <Card className="space-y-1">
-          <div className="flex items-baseline justify-between">
-            <div className="text-[15px] font-semibold text-mt-ink">Счёт карты</div>
-            <div className="text-[15px] font-semibold tabular-nums text-mt-ink">{money(c.card.balance_cents)}</div>
+        <Card className="space-y-3">
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <div className="text-[13px] text-muted">На виртуальной карте</div>
+              <div className="font-display text-[22px] font-semibold tabular-nums text-mt-ink">{money(v.balance_cents)}</div>
+            </div>
+            <div>
+              <div className="text-[13px] text-muted">На моём счёте</div>
+              <div className="font-display text-[22px] font-semibold tabular-nums text-mt-ink">{money(c.card.balance_cents)}</div>
+            </div>
           </div>
-          <p className="text-[13px] text-muted">Виртуальная карта и основная списывают деньги с одного счёта, лимиты общие.</p>
+          <Btn icon="wallet" onClick={() => { setDir('to_card'); setAmount(''); setXfer(true) }}>Перевести</Btn>
         </Card>
 
         <Card className="divide-y divide-line p-0">
@@ -170,6 +190,31 @@ export function VirtualCardScreen({ meId, ageGroup }: { meId: number; ageGroup: 
           {v.plastic.ordered_at && <div className="px-4 py-2.5 text-[13px] text-muted">Заказана {dateTime(v.plastic.ordered_at)}</div>}
         </Card>
       </div>
+
+      <Sheet open={xfer} onClose={() => setXfer(false)} title="Перевод между счётами">
+        <div className="space-y-4">
+          <div className="grid grid-cols-2 gap-2 rounded-2xl bg-elevated p-1">
+            {([['to_card', 'На карту'], ['to_account', 'На счёт']] as const).map(([id, label]) => (
+              <button key={id} type="button" onClick={() => { setDir(id); setAmount('') }}
+                className={`h-10 rounded-xl text-[14px] font-semibold transition ${dir === id ? 'bg-card text-mt-ink shadow-sm' : 'text-muted'}`}>{label}</button>
+            ))}
+          </div>
+          <div className="flex items-baseline justify-between rounded-2xl bg-elevated px-4 py-3">
+            <span className="text-[13px] text-muted">{dir === 'to_card' ? 'Со счёта' : 'С виртуальной карты'}</span>
+            <span className="text-[15px] font-semibold tabular-nums text-mt-ink">{money(fromCents)}</span>
+          </div>
+          <Field label="Сумма" value={amount} onChange={setAmount} placeholder="0" inputMode="decimal" suffix="BYN" />
+          <div className="flex flex-wrap gap-2">
+            {[500, 1000, 2000].filter((x) => x <= fromCents).map((x) => (
+              <button key={x} type="button" onClick={() => setAmount(String(x / 100))} className="rounded-full bg-elevated px-3.5 py-1.5 text-[13px] font-semibold text-mt-ink">{money(x)}</button>
+            ))}
+            {fromCents > 0 && <button type="button" onClick={() => setAmount(String(fromCents / 100).replace('.', ','))} className="rounded-full bg-elevated px-3.5 py-1.5 text-[13px] font-semibold text-mt-ink">Всё</button>}
+          </div>
+          {amountCents > fromCents && <Note tone="red" icon="alert">Не хватает {money(amountCents - fromCents)}.</Note>}
+          <Btn disabled={!xferOk} onClick={transfer}>{amountCents > 0 ? `Перевести ${money(amountCents)}` : 'Перевести'}</Btn>
+          <p className="text-[13px] text-muted">Это твои деньги: перевод не расходует дневной лимит трат.</p>
+        </div>
+      </Sheet>
 
       <Sheet open={plastic} onClose={() => setPlastic(false)} title="Пластиковая карта">
         <div className="space-y-4">
@@ -257,7 +302,7 @@ export function ParentVirtualCard({ childId, childName }: { childId: number; chi
           {v.issued ? (
             <>
               <CardArt holder={v.holder} last4={v.last4} frozen={v.status === 'frozen'} />
-              <p className="text-[13px] text-muted">Полный номер и CVC видит только ребёнок. Карта списывает деньги с того же счёта, лимиты и запреты общие.</p>
+              <p className="text-[13px] text-muted">Полный номер и CVC видит только ребёнок. Баланс карты: {money(v.balance_cents)}. Деньги на неё ребёнок переводит со своего счёта.</p>
               {v.plastic.status !== 'none' && (
                 <div className="rounded-2xl bg-elevated px-4 py-3 text-[13px] text-mt-ink">
                   <span className="font-semibold">Пластик: {PLASTIC_TEXT[v.plastic.status].toLowerCase()}.</span> {plasticLine(v)}
