@@ -214,8 +214,14 @@ export function VirtualCardScreen({ meId, ageGroup }: { meId: number; ageGroup: 
 // ───────── Вход на экран карты: строка на главной и в профиле ─────────
 export function CardEntry({ meId, variant }: { meId: number; variant: 'home' | 'row' }) {
   const { push } = useNav()
-  const { data: v } = useData(() => api.getVirtualCard(meId), [meId], 4000)
-  if (!v) return null
+  const { data: v, error } = useData(() => api.getVirtualCard(meId), [meId], 4000)
+  if (!v && !error) return null
+  if (!v) {
+    // сервер не ответил (например, бэкенд запущен со старым кодом): показываем причину вместо пустого места
+    return variant === 'row'
+      ? <Row icon="card-plus" title="Виртуальная карта" sub={`Не загрузилась: ${error}. Перезапусти бэкенд`} />
+      : <div className="rounded-[20px] bg-card p-3 text-[13px] text-muted"><span className="font-semibold text-mt-ink">Виртуальная карта.</span> Не загрузилась: {error}. Перезапусти бэкенд.</div>
+  }
   const go = () => push({ name: 'vcard' })
   const sub = v.issued
     ? `•• ${v.last4}${v.status === 'frozen' ? ', заморожена' : ''}${v.plastic.status !== 'none' ? `, пластик: ${PLASTIC_TEXT[v.plastic.status].toLowerCase()}` : ''}`
