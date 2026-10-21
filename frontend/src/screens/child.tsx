@@ -10,6 +10,7 @@ import {
 } from '../ui'
 import type { Category, DeclineReason, LessonResult, PayResult, PermissionKey, ReqType } from '../types'
 import { GoalCard, REQ_ICON, TaskHead, TxList, requestText } from './shared'
+import { MIN_GOAL_CENTS } from '../beaverState'
 import { BeaverPanel, LOGS_PER_LESSON, beaverInfo, damSrc, logWord } from './beaver'
 
 // ───────── Главная ребёнка ─────────
@@ -53,7 +54,7 @@ export function ChildHome({ meId }: { meId: number }) {
           <img src={damSrc(beaver.level.n)} alt="" className="h-14 w-16 shrink-0 rounded-[14px] object-cover" />
           <div className="min-w-0 flex-1">
             <div className="text-[15px] font-semibold text-mt-ink">Бобёр · уровень {beaver.level.n}</div>
-            <div className="text-[13px] text-muted">{beaver.level.title}{beaver.next ? `. До следующего ${Math.max(0, beaver.next.need - beaver.built)} ${logWord(Math.max(0, beaver.next.need - beaver.built))}` : ''}</div>
+            <div className={`text-[13px] ${beaver.health < 50 ? 'font-medium text-mt-red' : 'text-muted'}`}>{beaver.health < 50 ? 'Плотина течёт, нужен ремонт' : beaver.level.title}{beaver.health >= 50 && beaver.next ? `. До следующего ${Math.max(0, beaver.next.need - beaver.built)} ${logWord(Math.max(0, beaver.next.need - beaver.built))}` : ''}</div>
           </div>
           <Icon name="chevron-right" size={20} className="text-[#9AA6B8]" />
         </button>
@@ -350,6 +351,9 @@ function GoalsPanel({ meId }: { meId: number }) {
         <div className="space-y-4">
           <Field label="На что копим" value={title} onChange={setTitle} placeholder="Велосипед" />
           <Field label="Сколько нужно" inputMode="decimal" value={target} onChange={setTarget} placeholder="0" suffix="BYN" />
+          {toCents(target) > 0 && toCents(target) < MIN_GOAL_CENTS && (
+            <Note icon="shield">Цель меньше 20 BYN можно создать, но брёвна бобру за неё не даются</Note>
+          )}
           <Btn onClick={async () => {
             const c = toCents(target)
             if (!title.trim() || !(c > 0)) { toast('Заполните название и сумму'); return }

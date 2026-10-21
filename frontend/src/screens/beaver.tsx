@@ -2,71 +2,66 @@ import { useEffect, useRef, useState } from 'react'
 import { api } from '../api'
 import { plural } from '../format'
 import { useData } from '../hooks'
-import { Btn, Card, Loading, Progress, Row, Sheet } from '../ui'
+import { Btn, Card, Loading, Progress, Row, Sheet, toast } from '../ui'
+import {
+  CHANGE_EVENT, DAM_LEVELS, DAY, DECAY_PER_DAY, GRACE_DAYS, HEAL_PER_LOG, MIN_GOAL_CENTS, PLACE_PER_DAY,
+  collapseAt, dayOf, healthAt, levelByN, levelFor, loadState, noteEarned, now, saveState, tickState,
+  type BeaverState,
+} from '../beaverState'
 import '../beaver.css'
 
-// Вкладка «Бобёр»: питомец строит плотину из брёвен.
-// Брёвна считаются из реальных действий: накопления в целях, подтверждённые задания,
-// достигнутые цели, пройденные уроки. Купить их нельзя.
-// Прогресс (сколько брёвен уложено, какой уровень открыт) пока хранится в браузере.
-//
-// Сцены:
-//  1) «Построить» — бобёр бросает брёвна по одному;
-//  2) набран новый уровень — бобёр в форме строителя, плотина закрыта и достраивается;
-//  3) стройка закончена — кнопка «Открыть плотину», по нажатию плотина раскрывается.
+export { beaverInfo, DAM_LEVELS, levelByN, levelFor } from '../beaverState'
 
-const LOGS_PER_BUILD = 5
+// Вкладка «Бобёр»: питомец строит плотину из брёвен.
+// Брёвна считаются из реальных действий: накопления в целях от 20 BYN, подтверждённые задания,
+// достигнутые цели, пройденные уроки. Купить их нельзя.
+//
+// Правила, которые держат интерес:
+//  • склад: заработанные брёвна не пропадают, но бобёр укладывает не больше PLACE_PER_DAY в день;
+//  • новый уровень достраивается по настоящему таймеру, потом плотину открывают кнопкой;
+//  • прочность: если не заходить и не копить, плотина слабеет и в конце концов уровень падает;
+//    каждое уложенное бревно её чинит.
+// Всё состояние лежит в beaverState.ts.
+
 export const LOGS_PER_5_BYN = 1
 export const LOGS_PER_TASK = 3
-export const LOGS_PER_GOAL_DONE = 20
 export const LOGS_PER_LESSON = 2
+const GOAL_DONE_CAP = 10
 
 const PRE_WORK_MS = 250
 const THROW_GAP_MS = 800
 const FLIGHT_MS = 560
-const LEVEL_BUILD_MS = 9000
 const REVEAL_MS = 1900
 
 const SPEECH_AT_LEVEL = ['Надеваю каску', 'Строю плотину', 'Укладываю брёвна', 'Закрепляю ветками', 'Почти готово']
 
-export const DAM_LEVELS = [
-  { n: 1, need: 0, title: 'Ручеёк' },
-  { n: 2, need: 15, title: 'Первая плотина' },
-  { n: 3, need: 40, title: 'Крепкая плотина' },
-  { n: 4, need: 80, title: 'Плотина с домиком' },
-]
-
-export const builtKey = (id: number) => `beaver:${id}`
-export const shownKey = (id: number) => `beaver:${id}:lv`
-const readyKey = (id: number) => `beaver:${id}:ready`
-export function loadNum(key: string): number | null {
-  try {
-    const v = localStorage.getItem(key)
-    return v === null ? null : Number(v) || 0
-  } catch { return null }
-}
-function saveNum(key: string, v: number | null) {
-  try {
-    if (v === null) localStorage.removeItem(key)
-    else localStorage.setItem(key, String(v))
-  } catch { /* без хранилища просто не запоминаем */ }
-}
-
-export function levelFor(built: number) {
-  let lv = DAM_LEVELS[0]
-  for (const l of DAM_LEVELS) if (built >= l.need) lv = l
-  return lv
-}
-export const levelByN = (n: number) => DAM_LEVELS.find((l) => l.n === n) ?? DAM_LEVELS[0]
 export const damSrc = (n: number) => `/beaver/dam${n}.jpg`
 export const logWord = (n: number) => plural(n, 'бревно', 'бревна', 'брёвен')
 
-/** Какой уровень плотины открыт у ребёнка — для главной, профиля и экрана родителя */
-export function beaverInfo(childId: number) {
-  const built = loadNum(builtKey(childId)) ?? 0
-  const shown = levelByN(loadNum(shownKey(childId)) ?? levelFor(built).n)
-  const next = DAM_LEVELS.find((l) => l.n === levelFor(built).n + 1)
-  return { level: shown, built, next }
+function fmtLeft(ms: number) {
+  const s = Math.max(0, Math.ceil(ms / 1000))
+  if (s < 60) return `${s} с`
+  const m = Math.ceil(s / 60)
+  if (m < 60) return `${m} мин`
+  const h = Math.floor(m / 60)
+  const rest = m % 60
+  return rest ? `${h} ч ${rest} мин` : `${h} ч`
+}
+
+/** Сколько брёвен ребёнок заработал за всё время (без учёта того, сколько уже уложено) */
+function earnedLogs(
+  goals: { target_cents: number; saved_cents: number; status: string }[],
+  confirmedTasks: number,
+  doneLessons: number,
+) {
+  // Цели меньше 20 BYN брёвен не дают: иначе можно копить по рублю и накручивать бонусы
+  const fromGoals = goals.reduce((sum, g) => {
+    if (g.target_cents < MIN_GOAL_CENTS) return sum
+    const saved = Math.floor(g.saved_cents / 500) * LOGS_PER_5_BYN
+    const bonus = g.status === 'done' ? Math.min(GOAL_DONE_CAP, Math.floor(g.target_cents / 500)) : 0
+    return sum + saved + bonus
+  }, 0)
+  return fromGoals + confirmedTasks * LOGS_PER_TASK + doneLessons * LOGS_PER_LESSON
 }
 
 /** Иконка бревна в стиле остальных иконок приложения (контур, без эмодзи) */
@@ -92,7 +87,7 @@ function LogShape() {
   )
 }
 
-/** Блок с бобром и плотиной. Стоит наверху вкладки «Копилка». */
+/** Блок с бобром и плотиной. Стоит наверху вкладки «Бобёр». */
 export function BeaverPanel({ meId, ageGroup }: { meId: number; ageGroup: string }) {
   const teen = ageGroup === '14-17'
   const sprite = teen ? '/beaver/teen.png' : '/beaver/kid.png'
@@ -103,11 +98,13 @@ export function BeaverPanel({ meId, ageGroup }: { meId: number; ageGroup: string
   const tasks = useData(() => api.listTasks(), [], 3000)
   const lessons = useData(() => api.getLessons(), [], 3000)
 
-  const [built, setBuilt] = useState(() => loadNum(builtKey(meId)) ?? 0)
-  const [shown, setShown] = useState(() => loadNum(shownKey(meId)) ?? levelFor(loadNum(builtKey(meId)) ?? 0).n)
-  const [ready, setReady] = useState<number | null>(() => loadNum(readyKey(meId)))   // достроено, но ещё не открыто
-  const [target, setTarget] = useState<number | null>(null)                          // сейчас достраивается
-  const [cProg, setCProg] = useState(0)
+  // Состояние читаем один раз и сразу продвигаем до текущего момента: стройка могла закончиться, плотину могло размыть
+  const init = useRef<{ s: BeaverState; dropped: number } | null>(null)
+  if (!init.current) init.current = tickState(loadState(meId))
+  const [s, setS] = useState<BeaverState>(init.current.s)
+  const sRef = useRef(s)
+  const [, setClock] = useState(0)
+
   const [throwing, setThrowing] = useState(false)
   const [revealing, setRevealing] = useState(false)
   const [cheer, setCheer] = useState(false)
@@ -121,13 +118,65 @@ export function BeaverPanel({ meId, ageGroup }: { meId: number; ageGroup: string
   const damRef = useRef<HTMLDivElement>(null)
   const beaverRef = useRef<HTMLDivElement>(null)
   const timers = useRef<number[]>([])
-  const intervals = useRef<number[]>([])
   const uid = useRef(0)
-  useEffect(() => () => {
-    timers.current.forEach((t) => window.clearTimeout(t))
-    intervals.current.forEach((t) => window.clearInterval(t))
-  }, [])
   const later = (fn: () => void, ms: number) => { timers.current.push(window.setTimeout(fn, ms)) }
+
+  const commit = (n: BeaverState) => {
+    sRef.current = n
+    saveState(meId, n)
+    setS(n)
+  }
+  // Раз в секунду и после действий: заканчиваем стройку, меняем день, размываем плотину
+  const advance = () => {
+    const { s: n, dropped } = tickState(sRef.current)
+    if (JSON.stringify(n) !== JSON.stringify(sRef.current)) commit(n)
+    if (dropped > 0) {
+      toast(`Плотину размыло до уровня ${n.level}`)
+      setSpeech('Размыло… давай чинить')
+      later(() => setSpeech(null), 4000)
+    }
+    setClock((c) => c + 1)
+  }
+
+  useEffect(() => {
+    saveState(meId, sRef.current)
+    if (init.current && init.current.dropped > 0) toast(`Плотину размыло до уровня ${sRef.current.level}`)
+    const iv = window.setInterval(advance, 1000)
+    // демо-панель вне телефона меняет состояние: перечитываем
+    const onChange = () => { sRef.current = loadState(meId); setS(sRef.current); advance() }
+    window.addEventListener(CHANGE_EVENT, onChange)
+    return () => {
+      window.clearInterval(iv)
+      window.removeEventListener(CHANGE_EVENT, onChange)
+      timers.current.forEach((t) => window.clearTimeout(t))
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [meId])
+
+  const dataReady = !!(goals.data && tasks.data && lessons.data)
+  const earnedBase = dataReady
+    ? earnedLogs(
+      goals.data!.items,
+      tasks.data!.items.filter((t) => t.status === 'confirmed').length,
+      lessons.data!.items.filter((l) => l.completed).length,
+    )
+    : null
+
+  // Новая заработанная активность останавливает отсчёт «бобёр скучает»
+  useEffect(() => {
+    if (earnedBase === null) return
+    const n = noteEarned(sRef.current, earnedBase)
+    if (n !== sRef.current) commit(n)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [earnedBase])
+
+  const constructing = s.buildTo !== null
+  // Пока плотина достраивается, она слегка вздрагивает от ударов
+  useEffect(() => {
+    if (!constructing) return
+    const iv = window.setInterval(() => thud(), 700)
+    return () => window.clearInterval(iv)
+  }, [constructing])
 
   const thud = () => {
     damRef.current?.animate(
@@ -153,38 +202,13 @@ export function BeaverPanel({ meId, ageGroup }: { meId: number; ageGroup: string
     )
   }
 
-  const startConstruction = (to: number) => {
-    setTarget(to)
-    setCProg(0)
-    setSpeech(SPEECH_AT_LEVEL[0])
-    const t0 = Date.now()
-    let lastHit = -1
-    const iv = window.setInterval(() => {
-      const p = Math.min(1, (Date.now() - t0) / LEVEL_BUILD_MS)
-      setCProg(p)
-      setSpeech(SPEECH_AT_LEVEL[Math.min(SPEECH_AT_LEVEL.length - 1, Math.floor(p * SPEECH_AT_LEVEL.length))])
-      const hit = Math.floor((Date.now() - t0) / 700)
-      if (hit !== lastHit) { lastHit = hit; thud() }
-      if (p >= 1) {
-        window.clearInterval(iv)
-        setTarget(null)
-        setReady(to)
-        saveNum(readyKey(meId), to)
-        setSpeech('Готово! Открывай')
-      }
-    }, 120)
-    intervals.current.push(iv)
-  }
-
   const reveal = () => {
-    if (ready === null || revealing) return
-    const to = ready
+    const cur = sRef.current
+    if (cur.ready === null || revealing) return
+    const t = now()
     setSpeech(null)
     setRevealing(true)
-    setShown(to)
-    saveNum(shownKey(meId), to)
-    setReady(null)
-    saveNum(readyKey(meId), null)
+    commit({ ...cur, level: cur.ready, ready: null, hp: 100, lastActive: t })
     sceneRef.current?.animate(
       [{ transform: 'scale(1)' }, { transform: 'scale(0.97)', offset: 0.15 }, { transform: 'scale(1.015)', offset: 0.6 }, { transform: 'scale(1)' }],
       { duration: 900, easing: 'cubic-bezier(.2,.8,.2,1)' },
@@ -194,37 +218,29 @@ export function BeaverPanel({ meId, ageGroup }: { meId: number; ageGroup: string
     later(() => setCheer(false), 3200)
   }
 
-  // Вернулись на вкладку: либо плотина ждёт открытия, либо её надо достроить
-  useEffect(() => {
-    if (ready !== null && ready > shown) return
-    if (ready !== null) { setReady(null); saveNum(readyKey(meId), null) }
-    const earnedLevel = levelFor(built).n
-    if (earnedLevel > shown) startConstruction(earnedLevel)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
+  if (earnedBase === null) return <Loading />
 
-  if (!goals.data || !tasks.data || !lessons.data) return <Loading />
-
-  const fromGoals = goals.data.items.reduce((s, x) => s + Math.floor(x.saved_cents / 500) * LOGS_PER_5_BYN + (x.status === 'done' ? LOGS_PER_GOAL_DONE : 0), 0)
-  const fromTasks = tasks.data.items.filter((t) => t.status === 'confirmed').length * LOGS_PER_TASK
-  const fromLessons = lessons.data.items.filter((l) => l.completed).length * LOGS_PER_LESSON
-  const balance = Math.max(0, fromGoals + fromTasks + fromLessons - built)
-
-  const constructing = target !== null
-  const pending = target ?? ready            // уровень за «закрытой» плотиной
-  const hidden = pending !== null
-  const earnedLevel = levelFor(built)
-  const next = DAM_LEVELS.find((l) => l.n === earnedLevel.n + 1)
-  // перед новым уровнем кладём ровно столько, сколько до него осталось
-  const toNext = next ? next.need - built : Infinity
-  const spend = Math.max(0, Math.min(LOGS_PER_BUILD, balance, toNext))
-  const busy = throwing || hidden || revealing
+  const t = now()
+  const hidden = s.buildTo !== null || s.ready !== null
+  const pending = s.buildTo ?? s.ready                      // уровень за «закрытой» плотиной
+  const cProg = constructing ? Math.min(1, Math.max(0, (t - s.buildStart) / Math.max(1, s.buildEnd - s.buildStart))) : 0
   const pct = Math.round(cProg * 100)
+  const health = healthAt(s, t)
+  const placedToday = s.day === dayOf(t) ? s.placed : 0
+  const room = Math.max(0, PLACE_PER_DAY - placedToday)
+  const balance = Math.max(0, earnedBase + s.gift - s.built - s.lost)
+  const next = DAM_LEVELS.find((l) => l.n === levelFor(s.built).n + 1)
+  // перед новым уровнем кладём ровно столько, сколько до него осталось; на последнем уровне брёвна идут на ремонт
+  const toNext = next ? next.need - s.built : Math.ceil((100 - health) / HEAL_PER_LOG)
+  const spend = Math.max(0, Math.min(room, balance, toNext))
+  const busy = throwing || hidden || revealing
+  const shownLevel = levelByN(s.level)
+  const daysLeft = Math.max(0, Math.ceil((collapseAt(s) - t) / DAY))
+  const lowHp = s.level > 1 && health < 50
 
   const build = () => {
     if (busy || spend <= 0) return
     setThrowing(true)
-    let cur = built
     for (let i = 0; i < spend; i++) {
       later(() => {
         const id = ++uid.current
@@ -232,9 +248,16 @@ export function BeaverPanel({ meId, ageGroup }: { meId: number; ageGroup: string
         hop()
         later(() => {
           setFlying((f) => f.filter((x) => x !== id))
-          cur += 1
-          setBuilt(cur)
-          saveNum(builtKey(meId), cur)
+          const cur = sRef.current
+          const tt = now()
+          commit({
+            ...cur,
+            built: cur.built + 1,
+            day: dayOf(tt),
+            placed: (cur.day === dayOf(tt) ? cur.placed : 0) + 1,
+            hp: Math.min(100, healthAt(cur, tt) + HEAL_PER_LOG),
+            lastActive: tt,
+          })
           setBump((b) => b + 1)
           setPops((p) => [...p, id])
           later(() => setPops((p) => p.filter((x) => x !== id)), 900)
@@ -242,21 +265,25 @@ export function BeaverPanel({ meId, ageGroup }: { meId: number; ageGroup: string
         }, FLIGHT_MS)
       }, PRE_WORK_MS + i * THROW_GAP_MS)
     }
-    later(() => {
-      setThrowing(false)
-      const reached = levelFor(cur).n
-      if (reached > shown) startConstruction(reached)
-    }, PRE_WORK_MS + (spend - 1) * THROW_GAP_MS + FLIGHT_MS + 250)
+    // после последнего бревна проверяем, не пора ли начинать стройку нового уровня
+    later(() => { setThrowing(false); advance() }, PRE_WORK_MS + (spend - 1) * THROW_GAP_MS + FLIGHT_MS + 250)
   }
 
   const beaverSrc = hidden ? spriteBuilder : cheer ? spriteCheer : sprite
-  const shownLevel = levelByN(shown)
+  const talk = constructing
+    ? SPEECH_AT_LEVEL[Math.min(SPEECH_AT_LEVEL.length - 1, Math.floor(cProg * SPEECH_AT_LEVEL.length))]
+    : s.ready !== null ? 'Готово! Открывай'
+      : speech ?? (!busy && lowHp ? 'Плотина течёт, помоги' : null)
 
-  let btnText = `Построить · ${spend} ${logWord(spend)}`
+  let btnText = `${next ? 'Построить' : 'Починить'} · ${spend} ${logWord(spend)}`
   if (constructing) btnText = 'Плотина строится'
-  else if (ready !== null) btnText = 'Сначала открой плотину'
+  else if (s.ready !== null) btnText = 'Сначала открой плотину'
   else if (throwing) btnText = 'Бобёр работает'
+  else if (!next && health >= 100) btnText = 'Плотина в порядке'
   else if (balance <= 0) btnText = 'Нет брёвен'
+  else if (room <= 0) btnText = 'На сегодня хватит, завтра ещё'
+
+  const healthWord = health >= 70 ? 'Крепкая' : health >= 40 ? 'Есть трещины' : 'Течёт'
 
   return (
     <>
@@ -267,10 +294,10 @@ export function BeaverPanel({ meId, ageGroup }: { meId: number; ageGroup: string
               <img src={damSrc(pending!)} alt="" draggable={false} className="dam-veil absolute inset-0 h-full w-full object-cover" />
             ) : (
               <>
-                {revealing && <img src={damSrc(shown)} alt="" draggable={false} className="dam-veil absolute inset-0 h-full w-full object-cover" />}
+                {revealing && <img src={damSrc(s.level)} alt="" draggable={false} className="dam-veil absolute inset-0 h-full w-full object-cover" />}
                 <img
-                  key={`${shown}:${revealing}`}
-                  src={damSrc(shown)} alt={shownLevel.title} draggable={false}
+                  key={`${s.level}:${revealing}`}
+                  src={damSrc(s.level)} alt={shownLevel.title} draggable={false}
                   className={`absolute inset-0 h-full w-full object-cover ${revealing ? 'dam-reveal' : ''}`}
                 />
                 {revealing && <div className="dam-shine pointer-events-none absolute inset-y-0 -left-1/3 w-1/3 bg-gradient-to-r from-transparent via-white/60 to-transparent" />}
@@ -287,6 +314,7 @@ export function BeaverPanel({ meId, ageGroup }: { meId: number; ageGroup: string
                   <div className="mt-3 h-1 w-28 overflow-hidden rounded-full bg-white/25">
                     <div className="h-full rounded-full bg-white" style={{ width: `${pct}%` }} />
                   </div>
+                  <div className="mt-2 text-[13px] tabular-nums text-white/80">осталось {fmtLeft(s.buildEnd - t)}</div>
                 </>
               ) : (
                 <button
@@ -306,9 +334,9 @@ export function BeaverPanel({ meId, ageGroup }: { meId: number; ageGroup: string
             />
           </div>
 
-          {speech && (
-            <div key={speech} className="anim-speech pointer-events-none absolute left-[30%] top-4 z-10 rounded-2xl rounded-bl-[6px] bg-white px-3 py-1.5 text-[13px] font-medium text-[#141416]">
-              {speech}
+          {talk && (
+            <div key={talk} className="anim-speech pointer-events-none absolute left-[30%] top-4 z-10 rounded-2xl rounded-bl-[6px] bg-white px-3 py-1.5 text-[13px] font-medium text-[#141416]">
+              {talk}
             </div>
           )}
 
@@ -328,12 +356,12 @@ export function BeaverPanel({ meId, ageGroup }: { meId: number; ageGroup: string
             </span>
           ))}
 
-          <div key={bump} className="anim-log absolute right-3 top-3 z-10 flex items-center gap-1 rounded-full bg-white/90 px-2.5 py-1 text-xs font-semibold tabular-nums text-[#141416]">
+          <div key={bump} className="anim-log absolute right-3 top-3 z-10 flex items-center gap-1 rounded-full bg-white/90 px-2.5 py-1 text-xs font-semibold tabular-nums text-[#141416]" title="Брёвна на складе">
             <LogIcon size={15} />{balance}
           </div>
 
           {!hidden && (
-            <div key={`chip:${shown}`} className={`absolute left-3 top-3 rounded-full bg-white/90 px-3 py-1 text-xs font-semibold text-[#141416] ${revealing ? 'chip-in' : ''}`}>
+            <div key={`chip:${s.level}`} className={`absolute left-3 top-3 rounded-full bg-white/90 px-3 py-1 text-xs font-semibold text-[#141416] ${revealing ? 'chip-in' : ''}`}>
               Уровень {shownLevel.n} · {shownLevel.title}
             </div>
           )}
@@ -342,13 +370,31 @@ export function BeaverPanel({ meId, ageGroup }: { meId: number; ageGroup: string
         <Card>
           <div className="flex items-baseline justify-between">
             <div className="text-[15px] font-semibold text-mt-ink">{next ? `До уровня ${next.n}` : 'Все уровни пройдены'}</div>
-            {next && <div className="text-[15px] font-semibold tabular-nums text-muted">{built} из {next.need}</div>}
+            {next && <div className="text-[15px] font-semibold tabular-nums text-muted">{s.built} из {next.need}</div>}
           </div>
-          <div className="mt-3"><Progress value={next ? built : 1} max={next ? next.need : 1} tone="brand" /></div>
-          {next && <div className="mt-2 text-[13px] text-muted">Дальше: {next.title.toLowerCase()}</div>}
+          <div className="mt-3"><Progress value={next ? s.built : 1} max={next ? next.need : 1} tone="brand" /></div>
+          <div className="mt-2 text-[13px] text-muted">
+            Сегодня уложено {placedToday} из {PLACE_PER_DAY}
+            {next ? `. Дальше: ${next.title.toLowerCase()}` : ''}
+          </div>
         </Card>
 
-        <Btn onClick={build} disabled={busy || balance <= 0}>{btnText}</Btn>
+        {s.level > 1 && !hidden && (
+          <Card>
+            <div className="flex items-baseline justify-between">
+              <div className="text-[15px] font-semibold text-mt-ink">Прочность плотины</div>
+              <div className={`text-[15px] font-semibold tabular-nums ${lowHp ? 'text-mt-red' : 'text-muted'}`}>{healthWord} · {Math.round(health)}%</div>
+            </div>
+            <div className="mt-3"><Progress value={health} max={100} tone={lowHp ? 'brand' : 'blue'} /></div>
+            <div className="mt-2 text-[13px] text-muted">
+              {health >= 100
+                ? 'Плотина крепкая. Если долго не заходить, её начнёт размывать.'
+                : `Без ремонта размоет через ${daysLeft} ${plural(daysLeft, 'день', 'дня', 'дней')}. Каждое бревно чинит на ${HEAL_PER_LOG}%.`}
+            </div>
+          </Card>
+        )}
+
+        <Btn onClick={build} disabled={busy || spend <= 0}>{btnText}</Btn>
 
         <button type="button" onClick={() => setHowTo(true)} className="mx-auto block text-[13px] font-medium text-muted underline-offset-2 hover:underline">
           Как получить брёвна
@@ -357,12 +403,16 @@ export function BeaverPanel({ meId, ageGroup }: { meId: number; ageGroup: string
 
       <Sheet open={howTo} onClose={() => setHowTo(false)} title="Как получить брёвна">
         <Card className="divide-y divide-line p-0">
-          <Row icon="target" iconTone="blue" title="Отложить в цель" sub="1 бревно за каждые 5 BYN, бонус родителя тоже считается" />
+          <Row icon="target" iconTone="blue" title="Отложить в цель от 20 BYN" sub="1 бревно за каждые 5 BYN, бонус родителя тоже считается" />
           <Row icon="tasks" iconTone="blue" title="Выполнить задание" sub={`${LOGS_PER_TASK} ${logWord(LOGS_PER_TASK)}, когда родитель подтвердит`} />
-          <Row icon="check" iconTone="blue" title="Достичь цели" sub={`${LOGS_PER_GOAL_DONE} брёвен`} />
+          <Row icon="check" iconTone="blue" title="Достичь цели от 20 BYN" sub={`Ещё до ${GOAL_DONE_CAP} брёвен, по 1 за каждые 5 BYN цели`} />
           <Row icon="book" iconTone="blue" title="Пройти урок" sub={`${LOGS_PER_LESSON} ${logWord(LOGS_PER_LESSON)}`} />
         </Card>
-        <p className="mt-3 text-[13px] text-muted">Брёвна нельзя купить, только заработать. Чем больше уложено, тем выше уровень плотины.</p>
+        <p className="mt-3 text-[13px] text-muted">
+          Брёвна нельзя купить, только заработать. Они ждут на складе, а бобёр укладывает не больше {PLACE_PER_DAY} в день.
+          Если {GRACE_DAYS} дня не заходить и не копить, плотина начнёт слабеть на {DECAY_PER_DAY}% в день. Когда прочность кончится, уровень упадёт на один, а часть брёвен унесёт река.
+          Уложенные брёвна чинят плотину.
+        </p>
       </Sheet>
     </>
   )

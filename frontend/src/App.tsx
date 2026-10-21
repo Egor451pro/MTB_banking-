@@ -9,6 +9,7 @@ import { LoyaltyScreen } from './screens/shared'
 import { KidPage, PackageFlow, ParentDecisions, ParentHome, ParentKids, ParentProducts, ParentTasks } from './screens/parent'
 import { MobyShell } from './screens/moby'
 import { LoginScreen } from './screens/auth'
+import { BeaverDemo } from './screens/beaverDemo'
 import { useTheme } from './theme'
 import { Icon } from './icons'
 
@@ -208,7 +209,7 @@ export default function App() {
 
   return (
     <div className="flex min-h-[100dvh] flex-col items-center sm:gap-4 sm:py-5">
-      <div className="flex w-full items-center justify-center gap-2 bg-card px-3 py-2 ring-1 ring-line sm:w-auto sm:rounded-full sm:py-1.5 sm:pl-4 sm:shadow-sm">
+      <div className="flex w-full flex-wrap items-center justify-center gap-2 bg-card px-3 py-2 ring-1 ring-line sm:w-auto sm:rounded-full sm:py-1.5 sm:pl-4 sm:shadow-sm">
         <span className="hidden whitespace-nowrap text-xs font-semibold text-muted sm:inline">Демо{usingMock ? ' · mock' : ''}</span>
         {user ? (
           <>
@@ -234,6 +235,7 @@ export default function App() {
             <Icon name="card" size={14} />Покупка
           </button>
         )}
+        {user?.role === 'child' && <BeaverDemo childId={user.id} />}
         <button
           type="button"
           onClick={resetDemo}
