@@ -6,23 +6,27 @@ import { Icon } from '../icons'
 import { useNav } from '../nav'
 import { BalanceCard, Btn, CARD_ART, ConfirmBtn, Card, Field, Header, Loading, Note, Progress, Row, Sheet, toast } from '../ui'
 import type { Card as CardT, VirtualCard } from '../types'
-import { KID_DESIGNS, TEEN_DESIGNS, useCardDesign, type CardDesign, type CardSlot } from '../cardDesigns'
+import { useBeaverInfo, DAM_LEVELS } from '../beaverState'
+import { KID_DESIGNS, TEEN_DESIGNS, designById, isUnlocked, useCardDesign, type Chip, type CardDesign, type CardSlot } from '../cardDesigns'
 import '../beaver.css'
 
 // Виртуальная карта подростка (14–17 лет): выпуск в приложении, данные карты, заморозка,
 // отдельный баланс с переводами со счёта и обратно, заказ пластиковой карты за деньги со счёта.
 
+// Пока виртуальная карта не выпущена, на ней всегда классический дизайн и сменить его нельзя
+const CLASSIC = designById('classic', 'virtual')
+
 const groups = (n: string) => n.replace(/\D/g, '').replace(/(.{4})/g, '$1 ').trim()
 
 /** Карта в фирменном дизайне. Номер и имя пишем поверх чистой синей части картинки. */
-export function CardArt({ holder, last4, expires, frozen, mini, className = '', art }: {
-  holder?: string | null; last4?: string | null; expires?: string | null; frozen?: boolean; mini?: boolean; className?: string; art?: string
+export function CardArt({ holder, last4, expires, frozen, mini, className = '', art, chip = 'bl' }: {
+  holder?: string | null; last4?: string | null; expires?: string | null; frozen?: boolean; mini?: boolean; className?: string; art?: string; chip?: Chip
 }) {
   return (
     <div style={{ aspectRatio: 1.65 }} className={`relative w-full overflow-hidden rounded-[20px] shadow-[0_18px_36px_-18px_rgba(20,30,80,0.6)] ${className}`}>
       <img src={art ?? CARD_ART.virtual} alt="Виртуальная карта МТБанка" draggable={false}
         className={`absolute inset-0 h-full w-full object-cover transition ${frozen ? 'grayscale brightness-75' : ''}`} />
-      {!mini && <div className="absolute inset-x-0 bottom-0 p-[5%] text-white [text-shadow:0_1px_6px_rgba(0,0,0,0.5)]">
+      {!mini && <div className={`absolute inset-x-0 bottom-0 p-[5%] text-white ${chip === 'br' ? 'flex flex-col items-end text-right' : ''} [text-shadow:0_1px_6px_rgba(0,0,0,0.5)]`}>
         <div className="font-display text-[15px] font-semibold tabular-nums tracking-[0.2em]">{last4 ? `•••• ${last4}` : '•••• ••••'}</div>
         <div className="mt-1 flex items-center gap-3 text-[11px] font-semibold tracking-wider">
           <span className="max-w-[60%] truncate">{holder || 'ВАШЕ ИМЯ'}</span>
@@ -118,7 +122,7 @@ export function VirtualCardScreen({ meId, ageGroup }: { meId: number; ageGroup: 
       <>
         <Header title="Виртуальная карта" subtitle="Карта МТБанка в телефоне" onBack={back} />
         <div className="space-y-4 p-4">
-          <CardArt art={vDesign.src} holder={(holder || c.name).toUpperCase()} className={v.available ? '' : 'opacity-60 grayscale'} />
+          <CardArt art={CLASSIC.src} chip={CLASSIC.chip} holder={(holder || c.name).toUpperCase()} className={v.available ? '' : 'opacity-60 grayscale'} />
           {v.available ? (
             <Card className="space-y-4">
               <Field label="Имя на карте" value={holder} onChange={setHolder} placeholder={c.name} />
@@ -144,7 +148,7 @@ export function VirtualCardScreen({ meId, ageGroup }: { meId: number; ageGroup: 
       <Header title="Виртуальная карта" subtitle="Карта МТБанка в телефоне" onBack={back} />
       <div className="space-y-4 p-4">
         <div className={fresh ? 'card-in' : ''}>
-          <CardArt art={vDesign.src} holder={v.holder} last4={v.last4} expires={showing ? v.expires : null} frozen={frozen} />
+          <CardArt art={vDesign.src} chip={vDesign.chip} holder={v.holder} last4={v.last4} expires={showing ? v.expires : null} frozen={frozen} />
         </div>
         <Btn tone="secondary" icon="star" onClick={() => setPickOpen(true)}>Дизайн карты</Btn>
         <DesignPicker open={pickOpen} onClose={() => setPickOpen(false)} childId={meId} slot="virtual" title="Дизайн виртуальной карты" />
@@ -282,7 +286,7 @@ export function CardEntry({ meId, variant }: { meId: number; variant: 'home' | '
   }
   return (
     <button type="button" onClick={go} className="flex w-full items-center gap-3 rounded-[20px] bg-card p-3 text-left transition active:scale-[0.99]">
-      <div className="w-16 shrink-0"><CardArt art={entryArt.src} mini frozen={v.status === 'frozen'} className="!rounded-[10px] !shadow-none" /></div>
+      <div className="w-16 shrink-0"><CardArt art={(v.issued ? entryArt : CLASSIC).src} mini frozen={v.status === 'frozen'} className="!rounded-[10px] !shadow-none" /></div>
       <div className="min-w-0 flex-1">
         <div className="text-[15px] font-semibold text-mt-ink">Виртуальная карта</div>
         <div className="text-[13px] text-muted">{sub}</div>
@@ -295,15 +299,24 @@ export function CardEntry({ meId, variant }: { meId: number; variant: 'home' | '
 
 // ───────── Выбор дизайна карты ─────────
 // 14–17: свои дизайны и одна плашка «Детские», внутри те же, что у малышей. 7–13: только детские.
-function DesignTile({ d, on, onPick }: { d: CardDesign; on: boolean; onPick: () => void }) {
+function DesignTile({ d, on, locked, onPick }: { d: CardDesign; on: boolean; locked: boolean; onPick: () => void }) {
+  const lvName = DAM_LEVELS.find((l) => l.n === d.lvl)?.title ?? ''
   return (
-    <button type="button" onClick={onPick} aria-label={`Дизайн «${d.name}»`} aria-pressed={on}
+    <button type="button" onClick={onPick} aria-label={locked ? `Дизайн «${d.name}» закрыт, откроется на уровне ${d.lvl}` : `Дизайн «${d.name}»`} aria-pressed={on}
       className={`relative overflow-hidden rounded-[16px] bg-black text-left ring-2 transition active:scale-[0.98] ${on ? 'ring-mt-blue' : 'ring-transparent'}`}>
-      <div style={{ aspectRatio: 1.65 }} className="w-full overflow-hidden">
+      <div style={{ aspectRatio: 1.65, ...(locked ? { filter: 'blur(5px) grayscale(0.6) brightness(0.55)', transform: 'scale(1.1)' } : {}) }} className="w-full overflow-hidden">
         <img src={d.src} alt="" draggable={false} className="h-full w-full object-cover" />
       </div>
-      <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/70 to-transparent px-2.5 pb-1.5 pt-5 text-[12px] font-semibold text-white">{d.name}</div>
-      {on && <div className="absolute right-2 top-2 flex h-6 w-6 items-center justify-center rounded-full bg-mt-blue text-white"><Icon name="check" size={14} /></div>}
+      {locked ? (
+        <div className="absolute inset-0 flex flex-col items-center justify-center gap-1 px-2 text-center text-white">
+          <Icon name="lock" size={22} />
+          <div className="text-[12px] font-semibold leading-tight">Уровень плотины {d.lvl}</div>
+          <div className="text-[11px] leading-tight text-white/75">{lvName}</div>
+        </div>
+      ) : (
+        <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/70 to-transparent px-2.5 pb-1.5 pt-5 text-[12px] font-semibold text-white">{d.name}</div>
+      )}
+      {on && !locked && <div className="absolute right-2 top-2 flex h-6 w-6 items-center justify-center rounded-full bg-mt-blue text-white"><Icon name="check" size={14} /></div>}
     </button>
   )
 }
@@ -312,10 +325,14 @@ export function DesignPicker({ open, onClose, childId, slot, title, kind = 'teen
   open: boolean; onClose: () => void; childId: number; slot: CardSlot; title: string; kind?: 'teen' | 'kid'; defaultId?: string
 }) {
   const [cur, set] = useCardDesign(childId, slot, defaultId)
+  const dam = useBeaverInfo(childId, true).level.n
   const [kids, setKids] = useState(kind === 'kid')
   useEffect(() => { if (open) setKids(kind === 'kid') }, [open, kind])
   const list = kids ? KID_DESIGNS : TEEN_DESIGNS
-  const pick = (id: string) => { set(id); onClose() }
+  const pick = (d: CardDesign) => {
+    if (!isUnlocked(d, dam)) { toast(`Откроется на ${d.lvl}-м уровне плотины. Копи брёвна — бобёр достроит!`); return }
+    set(d.id); onClose()
+  }
   const curIsKid = KID_DESIGNS.some((d) => d.id === cur.id)
   return (
     <Sheet open={open} onClose={onClose} title={kids && kind === 'teen' ? 'Детские дизайны' : title}>
@@ -335,12 +352,12 @@ export function DesignPicker({ open, onClose, childId, slot, title, kind = 'teen
             </div>
             <div className="min-w-0 flex-1">
               <div className="text-[15px] font-semibold text-mt-ink">Детские</div>
-              <div className="text-[12px] text-muted">Дизайны карт для 7–13 лет, их тоже можно выбрать</div>
+              <div className="text-[12px] text-muted">Дизайны для 7–13 лет, открываются с ростом плотины</div>
             </div>
             <Icon name="chevron-right" size={20} className="text-[#9AA6B8]" />
           </button>
         )}
-        {list.map((d) => <DesignTile key={d.id} d={d} on={d.id === cur.id} onPick={() => pick(d.id)} />)}
+        {list.map((d) => <DesignTile key={d.id} d={d} on={d.id === cur.id} locked={!isUnlocked(d, dam)} onPick={() => pick(d)} />)}
       </div>
     </Sheet>
   )
@@ -352,7 +369,7 @@ export function KidMainCard({ meId, card, limit }: { meId: number; card: CardT; 
   const [open, setOpen] = useState(false)
   return (
     <div className="space-y-3">
-      <CardFace art={d.src} card={card} label="Моя карта" chipTop />
+      <CardFace art={d.src} card={card} label="Моя карта" chip={d.chip} />
       <div className="flex justify-center">
         <button type="button" onClick={() => setOpen(true)} className="flex items-center gap-1.5 rounded-full bg-card px-3.5 py-1.5 text-[13px] font-semibold text-mt-blue ring-1 ring-line transition active:scale-[0.97]">
           <Icon name="star" size={15} />Сменить дизайн
@@ -367,14 +384,14 @@ export function KidMainCard({ meId, card, limit }: { meId: number; card: CardT; 
 // ───────── Основная карта картинкой и лимит на сегодня (главная ребёнка) ─────────
 type LimitToday = { limit_cents: number | null; spent_cents: number; left_cents: number | null }
 
-export function CardFace({ art, card, label, chipTop }: { art: string; card: CardT; label: string; chipTop?: boolean }) {
+export function CardFace({ art, card, label, chip = 'bl' }: { art: string; card: CardT; label: string; chip?: Chip }) {
   const blocked = card.status === 'blocked'
   return (
     <div className="relative">
       <div style={{ aspectRatio: 1.65 }} className={`relative w-full overflow-hidden rounded-[24px] bg-black ${blocked ? 'grayscale brightness-75' : ''}`}>
         <img src={art} alt={label} draggable={false} className="h-full w-full object-cover" />
       </div>
-      <div className={`absolute ${chipTop ? 'right-3 top-3' : 'bottom-3 left-3'} rounded-2xl bg-black/45 px-3 py-1.5 text-white backdrop-blur-sm`}>
+      <div className={`absolute ${chip === 'br' ? 'bottom-3 right-3 text-right' : 'bottom-3 left-3'} rounded-2xl bg-black/45 px-3 py-1.5 text-white backdrop-blur-sm`}>
         <div className="text-[10px] font-semibold uppercase tracking-wide text-white/75">{blocked ? 'Заблокирована' : label} •• {card.last4}</div>
         <div className="font-display text-[17px] font-bold tabular-nums">{money(card.balance_cents)}</div>
       </div>
@@ -406,6 +423,7 @@ export function CardsCarousel({ meId, card, limit }: { meId: number; card: CardT
   const [pickOpen, setPickOpen] = useState(false)
   const [vDesign] = useCardDesign(meId, 'virtual')
   const [mDesign] = useCardDesign(meId, 'main')
+  if (!v && !error) return <div className="space-y-3"><div style={{ aspectRatio: 1.65 }} className="w-full animate-pulse rounded-[24px] bg-line" /><LimitStrip limit={limit} blocked={card.status === 'blocked'} /></div>
   if (!v) return <div className="space-y-3"><BalanceCard card={card} title="Основная карта" limit={limit} art={mDesign.src} />{error && <CardEntry meId={meId} variant="home" />}</div>
 
   const onScroll = () => {
@@ -425,10 +443,10 @@ export function CardsCarousel({ meId, card, limit }: { meId: number; card: CardT
           className="flex snap-x snap-mandatory overflow-x-auto scroll-smooth [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
           <button type="button" onClick={() => push({ name: 'vcard' })} aria-label="Открыть виртуальную карту"
             className="relative block w-full shrink-0 snap-center snap-always text-left transition active:scale-[0.99]">
-            <CardArt art={vDesign.src} holder={v.issued ? v.holder : null} last4={v.issued ? v.last4 : null} mini={!v.issued} frozen={frozen}
+            <CardArt art={(v.issued ? vDesign : CLASSIC).src} chip={(v.issued ? vDesign : CLASSIC).chip} holder={v.issued ? v.holder : null} last4={v.issued ? v.last4 : null} mini={!v.issued} frozen={frozen}
               className={`!rounded-[24px] !shadow-none ${v.issued ? '' : 'grayscale'}`} />
             {v.issued ? (
-              <div className="absolute bottom-3 right-3 rounded-2xl bg-black/45 px-3 py-1.5 text-right text-white backdrop-blur-sm">
+              <div className={`absolute bottom-3 ${vDesign.chip === 'br' ? 'right-3 text-right' : 'left-3'} rounded-2xl bg-black/45 px-3 py-1.5 text-white backdrop-blur-sm`}>
                 <div className="text-[10px] font-semibold uppercase tracking-wide text-white/75">Виртуальная</div>
                 <div className="font-display text-[17px] font-bold tabular-nums">{money(v.balance_cents)}</div>
               </div>
@@ -439,7 +457,7 @@ export function CardsCarousel({ meId, card, limit }: { meId: number; card: CardT
               </div>
             )}
           </button>
-          <div className="w-full shrink-0 snap-center snap-always"><CardFace art={mDesign.src} card={card} label="Основная" /></div>
+          <div className="w-full shrink-0 snap-center snap-always"><CardFace art={mDesign.src} card={card} label="Основная" chip={mDesign.chip} /></div>
         </div>
         <div className="mt-3 flex justify-center gap-2">
           {[0, 1].map((i) => (
@@ -448,9 +466,15 @@ export function CardsCarousel({ meId, card, limit }: { meId: number; card: CardT
           ))}
         </div>
         <div className="mt-2 flex justify-center">
-          <button type="button" onClick={() => setPickOpen(true)} className="flex items-center gap-1.5 rounded-full bg-card px-3.5 py-1.5 text-[13px] font-semibold text-mt-blue ring-1 ring-line transition active:scale-[0.97]">
-            <Icon name="star" size={15} />Сменить дизайн
-          </button>
+          {idx === 0 && !v.issued ? (
+            <div className="flex items-center gap-1.5 rounded-full bg-card px-3.5 py-1.5 text-[13px] font-medium text-muted ring-1 ring-line">
+              <Icon name="lock" size={14} />Дизайн можно выбрать после выпуска карты
+            </div>
+          ) : (
+            <button type="button" onClick={() => setPickOpen(true)} className="flex items-center gap-1.5 rounded-full bg-card px-3.5 py-1.5 text-[13px] font-semibold text-mt-blue ring-1 ring-line transition active:scale-[0.97]">
+              <Icon name="star" size={15} />Сменить дизайн
+            </button>
+          )}
         </div>
         <DesignPicker open={pickOpen} onClose={() => setPickOpen(false)} childId={meId} slot={idx === 0 ? 'virtual' : 'main'} title={idx === 0 ? 'Дизайн виртуальной карты' : 'Дизайн основной карты'} />
       </div>

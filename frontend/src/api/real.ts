@@ -51,6 +51,7 @@ export function realApi(base: string): Api {
     createGoal: (title, target_cents) => post('/goals', { title, target_cents }),
     getGoals: (id) => get(`/children/${id}/goals`),
     depositGoal: (id, amount_cents) => post(`/goals/${id}/deposit`, { amount_cents }),
+    withdrawGoal: (id, amount_cents) => post(`/goals/${id}/withdraw`, { amount_cents }),
     setGoalBonus: (id, parent_bonus_percent) => put(`/goals/${id}/bonus`, { parent_bonus_percent }),
     createTask: (r) => post('/tasks', r),
     listTasks: (childId) => get(`/tasks${childId ? `?child_id=${childId}` : ''}`),

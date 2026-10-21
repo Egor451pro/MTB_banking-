@@ -140,6 +140,14 @@ export interface BonusDecision {
   saved_cents: number
 }
 
+// Родитель снимает деньги с копилки ребёнка: они возвращаются на карту ребёнка
+export interface WithdrawResult {
+  saved_cents: number
+  card_balance_cents: number
+  withdrawn_cents: number
+  status: 'active' | 'done'
+}
+
 export interface GoalsResp {
   items: Goal[]
 }

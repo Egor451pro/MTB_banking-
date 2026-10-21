@@ -319,7 +319,7 @@ export function mockApi(): Api {
     const gl = generalLimit(childId)
     if (gl && spentToday(a.id) + amount > gl.amount_cents + extraToday(childId)) return { status: 'declined', reason: 'limit_exceeded', text: 'Превышен дневной лимит' }
     const catLimit = limits.find((l) => l.category === category && l.period === 'day' && !l.is_blocked && l.amount_cents > 0)
-    if (catLimit && spentToday(a.id, category) + amount > catLimit.amount_cents) return { status: 'declined', reason: 'limit_exceeded', text: `Превышен лимит по категории «${CATEGORY_LABEL[category]}»` }
+    if (catLimit && spentToday(a.id, category) + amount > catLimit.amount_cents + extraToday(childId)) return { status: 'declined', reason: 'limit_exceeded', text: `Превышен лимит по категории «${CATEGORY_LABEL[category]}»` }
     if (online && amount > 2000) return { status: 'pending', reason: null, text: 'Покупка ждёт подтверждения родителя' }
     return { status: 'approved', reason: null, text: 'Оплата прошла' }
   }
@@ -540,6 +540,21 @@ export function mockApi(): Api {
 
     async approveBonus(id) { return decideBonus(id, true) },
     async rejectBonus(id) { return decideBonus(id, false) },
+
+    async withdrawGoal(id, amount) {
+      requireParent()
+      const g = db.goals.find((x) => x.id === id)
+      if (!g) throw new MockError('not_found', 'Цель не найдена')
+      access(g.child_id)
+      if (!(amount > 0)) throw new MockError('validation_error', 'Сумма должна быть больше нуля')
+      if (amount > g.saved_cents) throw new MockError('validation_error', 'В копилке меньше денег, чем вы хотите снять')
+      const a = card(g.child_id)
+      g.saved_cents -= amount
+      if (g.status === 'done' && g.saved_cents < g.target_cents) g.status = 'active'
+      a.balance_cents += amount
+      db.txs.push({ id: ++db.seq.tx, account_id: a.id, amount_cents: amount, direction: 'in', category: null, merchant: `Из копилки «${g.title}»`, status: 'approved', decline_reason: null, created_at: new Date().toISOString() })
+      return delay({ saved_cents: g.saved_cents, card_balance_cents: a.balance_cents, withdrawn_cents: amount, status: g.status })
+    },
 
     async setGoalBonus(id, percent) {
       requireParent()

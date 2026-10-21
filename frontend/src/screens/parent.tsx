@@ -600,6 +600,8 @@ function BeaverCard({ childId }: { childId: number }) {
 
 function GoalsParent({ childId }: { childId: number }) {
   const { data, reload } = useData(() => api.getGoals(childId), [childId], 3000)
+  const [wd, setWd] = useState<{ id: number; title: string; saved: number } | null>(null)
+  const [amount, setAmount] = useState('')
   if (!data) return <Loading />
   if (!data.items.length) return <Empty text="Ребёнок пока не поставил цель" icon="target" />
   return (
@@ -615,8 +617,31 @@ function GoalsParent({ childId }: { childId: number }) {
             value={g.parent_bonus_percent}
             onChange={async (p) => { await api.setGoalBonus(g.id, p); await reload() }}
           />
+          {g.saved_cents > 0 && (
+            <div className="mt-3">
+              <Btn tone="secondary" icon="wallet" onClick={() => { setAmount(''); setWd({ id: g.id, title: g.title, saved: g.saved_cents }) }}>Снять с копилки</Btn>
+            </div>
+          )}
         </GoalCard>
       ))}
+      <Sheet open={!!wd} onClose={() => setWd(null)} title={wd ? `Снять с копилки «${wd.title}»` : ''}>
+        {wd && (
+          <div className="space-y-4">
+            <p className="text-[14px] text-muted">В копилке {money(wd.saved)}. Деньги вернутся на карту ребёнка, а цель станет меньше заполнена.</p>
+            <Field label="Сумма" inputMode="decimal" value={amount} onChange={setAmount} placeholder="0" suffix="BYN" />
+            <button onClick={() => setAmount(String(wd.saved / 100))} className="h-9 w-full rounded-[10px] bg-tint text-sm font-semibold text-[#2F6FE4]">Снять всё · {money(wd.saved)}</button>
+            <Btn onClick={async () => {
+              const cents = toCents(amount)
+              if (!(cents > 0)) { toast('Введите сумму больше нуля'); return }
+              if (cents > wd.saved) { toast('В копилке меньше этой суммы'); return }
+              await api.withdrawGoal(wd.id, cents)
+              setWd(null); setAmount('')
+              await reload()
+              toast('Деньги сняты с копилки и вернулись на карту ребёнка')
+            }}>Снять</Btn>
+          </div>
+        )}
+      </Sheet>
     </>
   )
 }

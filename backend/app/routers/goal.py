@@ -11,7 +11,7 @@ from app.models import User
 from app.schemas.goal import (
     GoalsListResponse, CreateGoalRequest, CreateGoalResponse,
     DepositGoalRequest, DepositGoalResponse,
-    SetBonusRequest, SetBonusResponse,
+    SetBonusRequest, SetBonusResponse, WithdrawGoalRequest, WithdrawGoalResponse,
     PendingBonusesResponse, BonusDecisionResponse,
 )
 from app.services.goal_service import GoalService
@@ -71,6 +71,22 @@ async def deposit_to_goal(
         child=child,
         amount_cents=request.amount_cents,
         db=db
+    )
+
+
+@router.post("/goals/{goal_id}/withdraw", response_model=WithdrawGoalResponse)
+async def withdraw_from_goal(
+    goal_id: int,
+    request: WithdrawGoalRequest,
+    parent: Annotated[User, Depends(require_parent)],
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    POST /goals/{id}/withdraw
+    Родитель снимает деньги с копилки ребенка, они возвращаются на карту ребенка.
+    """
+    return await GoalService.withdraw_from_goal(
+        goal_id=goal_id, parent=parent, amount_cents=request.amount_cents, db=db
     )
 
 

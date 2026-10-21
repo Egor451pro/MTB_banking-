@@ -55,6 +55,19 @@ class DepositGoalResponse(BaseModel):
     status: GoalStatus
 
 
+class WithdrawGoalRequest(BaseModel):
+    """POST /goals/{id}/withdraw - родитель снимает деньги с копилки ребенка"""
+    amount_cents: int = Field(..., gt=0)
+
+
+class WithdrawGoalResponse(BaseModel):
+    """Ответ на снятие денег с копилки"""
+    saved_cents: int
+    card_balance_cents: int
+    withdrawn_cents: int
+    status: GoalStatus
+
+
 class SetBonusRequest(BaseModel):
     """PUT /goals/{id}/bonus - установить процент бонуса от родителя"""
     parent_bonus_percent: int = Field(..., ge=0, le=100)

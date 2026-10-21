@@ -2,34 +2,36 @@ import { useEffect, useState } from 'react'
 
 // Дизайны карт подростка (14–17): каждый выбирает свой отдельно для основной и виртуальной карты.
 // Выбор хранится на устройстве (localStorage), в проде его стоит хранить на сервере в профиле ребёнка.
-export interface CardDesign { id: string; name: string; src: string }
+// Куда ставить баланс и номер карты, чтобы не закрыть надписи и персонажа на конкретном дизайне
+export type Chip = 'bl' | 'br'
+export interface CardDesign { id: string; name: string; src: string; lvl: number; chip: Chip }
 
 export const TEEN_DESIGNS: CardDesign[] = [
-  { id: 'grad', name: 'Выпускник', src: '/card/graduate.jpg' },
-  { id: 'classic', name: 'Классика', src: '/card/main.jpg' },
-  { id: 'skate', name: 'Скейт', src: '/card/t1.jpg' },
-  { id: 'backpack', name: 'В путь', src: '/card/t2.jpg' },
-  { id: 'goals', name: 'Большие цели', src: '/card/t3.jpg' },
-  { id: 'gamer', name: 'Геймер', src: '/card/t4.jpg' },
-  { id: 'travel', name: 'Больше возможностей', src: '/card/t5.jpg' },
-  { id: 'can', name: 'Ты можешь больше', src: '/card/t6.jpg' },
-  { id: 'peace', name: 'Привет', src: '/card/t7.jpg' },
-  { id: 'path', name: 'Свой путь', src: '/card/t8.jpg' },
-  { id: 'cap', name: 'Кепка', src: '/card/t9.jpg' },
+  { id: 'grad', name: 'Выпускник', src: '/card/graduate.jpg', lvl: 1, chip: 'bl' },
+  { id: 'classic', name: 'Классика', src: '/card/main.jpg', lvl: 1, chip: 'bl' },
+  { id: 'skate', name: 'Скейт', src: '/card/t1.jpg', lvl: 2, chip: 'bl' },
+  { id: 'backpack', name: 'В путь', src: '/card/t2.jpg', lvl: 2, chip: 'bl' },
+  { id: 'goals', name: 'Большие цели', src: '/card/t3.jpg', lvl: 3, chip: 'br' },
+  { id: 'gamer', name: 'Геймер', src: '/card/t4.jpg', lvl: 3, chip: 'bl' },
+  { id: 'travel', name: 'Больше возможностей', src: '/card/t5.jpg', lvl: 4, chip: 'br' },
+  { id: 'can', name: 'Ты можешь больше', src: '/card/t6.jpg', lvl: 4, chip: 'bl' },
+  { id: 'peace', name: 'Привет', src: '/card/t7.jpg', lvl: 3, chip: 'bl' },
+  { id: 'path', name: 'Свой путь', src: '/card/t8.jpg', lvl: 2, chip: 'bl' },
+  { id: 'cap', name: 'Кепка', src: '/card/t9.jpg', lvl: 1, chip: 'bl' },
 ]
 
 // Детские дизайны (7–13): основной выбор у малышей, а подросткам доступны отдельной плашкой «Детские»
 export const KID_DESIGNS: CardDesign[] = [
-  { id: 'kid', name: 'Бобёр в кепке', src: '/card/kid.jpg' },
-  { id: 'k-dreams', name: 'Большие мечты', src: '/card/k1.jpg' },
-  { id: 'k-school', name: 'Урок', src: '/card/k2.jpg' },
-  { id: 'k-self', name: 'Будь собой', src: '/card/k3.jpg' },
-  { id: 'k-music', name: 'Музыка', src: '/card/k4.jpg' },
-  { id: 'k-goal', name: 'Вперёд к целям', src: '/card/k5.jpg' },
-  { id: 'k-space', name: 'Космос', src: '/card/k6.jpg' },
-  { id: 'k-habits', name: 'Хорошие привычки', src: '/card/k7.jpg' },
-  { id: 'k-can', name: 'Ты можешь больше', src: '/card/k8.jpg' },
-  { id: 'k-snow', name: 'Сноуборд', src: '/card/k9.jpg' },
+  { id: 'kid', name: 'Бобёр в кепке', src: '/card/kid.jpg', lvl: 1, chip: 'bl' },
+  { id: 'k-dreams', name: 'Большие мечты', src: '/card/k1.jpg', lvl: 1, chip: 'br' },
+  { id: 'k-school', name: 'Урок', src: '/card/k2.jpg', lvl: 1, chip: 'bl' },
+  { id: 'k-self', name: 'Будь собой', src: '/card/k3.jpg', lvl: 2, chip: 'bl' },
+  { id: 'k-music', name: 'Музыка', src: '/card/k4.jpg', lvl: 2, chip: 'br' },
+  { id: 'k-goal', name: 'Вперёд к целям', src: '/card/k5.jpg', lvl: 2, chip: 'bl' },
+  { id: 'k-space', name: 'Космос', src: '/card/k6.jpg', lvl: 3, chip: 'bl' },
+  { id: 'k-habits', name: 'Хорошие привычки', src: '/card/k7.jpg', lvl: 3, chip: 'bl' },
+  { id: 'k-can', name: 'Ты можешь больше', src: '/card/k8.jpg', lvl: 4, chip: 'br' },
+  { id: 'k-snow', name: 'Сноуборд', src: '/card/k9.jpg', lvl: 4, chip: 'bl' },
 ]
 
 export type CardSlot = 'main' | 'virtual'
@@ -62,3 +64,6 @@ export function useCardDesign(childId: number, slot: CardSlot, def?: string): [C
   }
   return [d, set]
 }
+
+// Дизайны открываются по мере роста плотины: уровень 1 — базовые, дальше по мере стройки.
+export const isUnlocked = (d: CardDesign, damLevel: number) => d.lvl <= damLevel

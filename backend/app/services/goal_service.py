@@ -8,10 +8,11 @@ from sqlalchemy import func, select
 from fastapi import HTTPException
 from typing import List
 
-from app.models import Goal, GoalBonus, GoalStatus, User, Account
+from app.models import Goal, GoalBonus, GoalStatus, User, Account, Transaction
+from app.models.models import TransactionDirection, TransactionStatus
 from app.schemas.goal import (
     GoalItem, GoalsListResponse, CreateGoalResponse,
-    DepositGoalResponse, SetBonusResponse,
+    DepositGoalResponse, SetBonusResponse, WithdrawGoalResponse,
     PendingBonusItem, PendingBonusesResponse, BonusDecisionResponse,
 )
 
@@ -188,6 +189,59 @@ class GoalService:
             status=goal.status.value
         )
     
+    @staticmethod
+    async def withdraw_from_goal(
+        goal_id: int,
+        parent: User,
+        amount_cents: int,
+        db: AsyncSession
+    ) -> WithdrawGoalResponse:
+        """
+        Родитель снимает деньги с копилки ребенка: сумма возвращается на карту ребенка.
+        POST /goals/{id}/withdraw
+        """
+        goal = (await db.execute(select(Goal).where(Goal.id == goal_id))).scalar_one_or_none()
+        if not goal:
+            raise HTTPException(status_code=404, detail={"error": "not_found", "message": "Цель не найдена"})
+
+        child = (await db.execute(select(User).where(User.id == goal.child_id))).scalar_one_or_none()
+        if not child or child.family_id != parent.family_id:
+            raise HTTPException(status_code=403, detail={"error": "forbidden", "message": "Нет доступа к этой цели"})
+
+        if amount_cents > goal.saved_cents:
+            raise HTTPException(
+                status_code=422,
+                detail={"error": "validation_error", "message": "В копилке меньше денег, чем вы хотите снять"},
+            )
+
+        account = (await db.execute(select(Account).where(Account.owner_id == child.id))).scalar_one_or_none()
+        if not account:
+            raise HTTPException(status_code=404, detail={"error": "not_found", "message": "Карта не найдена"})
+
+        goal.saved_cents -= amount_cents
+        # Цель была достигнута, но после снятия денег снова не хватает — открываем её обратно
+        if goal.status == GoalStatus.DONE and goal.saved_cents < goal.target_cents:
+            goal.status = GoalStatus.ACTIVE
+        account.balance_cents += amount_cents
+        db.add(Transaction(
+            account_id=account.id,
+            amount_cents=amount_cents,
+            direction=TransactionDirection.IN,
+            category=None,
+            merchant=f"Из копилки «{goal.title}»",
+            is_online=False,
+            status=TransactionStatus.APPROVED,
+            decline_reason=None,
+        ))
+        await db.flush()
+
+        return WithdrawGoalResponse(
+            saved_cents=goal.saved_cents,
+            card_balance_cents=account.balance_cents,
+            withdrawn_cents=amount_cents,
+            status=goal.status.value,
+        )
+
     @staticmethod
     async def set_parent_bonus(
         goal_id: int,
