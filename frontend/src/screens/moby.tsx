@@ -1,4 +1,4 @@
-import { useRef, useState, type ReactNode } from 'react'
+import { useLayoutEffect, useRef, useState, type ReactNode } from 'react'
 import { money } from '../format'
 import { useNav } from '../nav'
 
@@ -9,8 +9,9 @@ import { useNav } from '../nav'
 type MobyTab = 'home' | 'products' | 'family' | 'chat' | 'more'
 type Mode = 'moby' | 'opening' | 'family' | 'closing'
 
-const OPEN_MS = 650
-const CLOSE_MS = 520
+const OPEN_MS = 560
+const CLOSE_MS = 480
+const EASE = 'cubic-bezier(.32,.72,0,1)' // кривая системных переходов iOS
 
 // ───────── Иконки нижнего меню и главной (контурные, как в Moby) ─────────
 function I({ children, size = 26 }: { children: ReactNode; size?: number }) {
@@ -41,7 +42,7 @@ function MobyMark({ size = 26 }: { size?: number }) {
 }
 
 // ───────── Главная Moby ─────────
-function MobyHome({ name, onFamily }: { name: string; onFamily: () => void }) {
+function MobyHome({ name, onFamily }: { name: string; onFamily: (from: HTMLElement) => void }) {
   return (
     <div className="min-h-full bg-surface pb-6">
       <div className="rounded-b-[34px] bg-gradient-to-b from-[#2F6BE6] to-[#5B95F2] px-6 pb-8 pt-[max(env(safe-area-inset-top),24px)] text-white sm:pt-[74px]">
@@ -68,7 +69,7 @@ function MobyHome({ name, onFamily }: { name: string; onFamily: () => void }) {
         </div>
 
         {/* Баннер нашего раздела — второй вход в «Семью», кроме нижнего меню */}
-        <button type="button" onClick={onFamily} className="relative flex h-[84px] w-full items-center overflow-hidden rounded-[22px] bg-gradient-to-r from-[#2334C8] to-[#2F6BE6] px-5 text-left text-white">
+        <button type="button" onClick={(e) => onFamily(e.currentTarget)} className="relative flex h-[84px] w-full items-center overflow-hidden rounded-[22px] bg-gradient-to-r from-[#2334C8] to-[#2F6BE6] px-5 text-left text-white">
           <div className="absolute -right-6 -top-8 h-32 w-32 rounded-full bg-[#E42C26]" />
           <div className="absolute -right-2 top-10 h-[90px] w-40 rotate-[-18deg] bg-[#FF5912]" />
           <div className="relative z-10">
@@ -127,28 +128,64 @@ function MobyNav({ active, onPick, familyRef }: { active: MobyTab; onPick: (t: M
   )
 }
 
-/** Moby + наш раздел. Переход: круг раскрывается из вкладки «Семья», Moby уходит вглубь. */
+/** Moby + наш раздел. Переход как открытие приложения на iPhone: вкладка «Семья»
+ *  превращается в скруглённую карточку и растягивается на весь экран, Moby уходит назад.
+ *  Закрытие — обратно в ту же вкладку (или баннер, если открыли с него). */
 export function MobyShell({ name, family }: { name: string; family: (onExit: () => void) => ReactNode }) {
   const { setTab } = useNav()
   const [tab, setMobyTab] = useState<MobyTab>('home')
   const [mode, setMode] = useState<Mode>('moby')
-  const [origin, setOrigin] = useState({ x: '50%', y: '92%' })
   const rootRef = useRef<HTMLDivElement>(null)
+  const mobyRef = useRef<HTMLDivElement>(null)
+  const layerRef = useRef<HTMLDivElement>(null)
+  const contentRef = useRef<HTMLDivElement>(null)
+  const coverRef = useRef<HTMLDivElement>(null)
   const familyBtn = useRef<HTMLButtonElement>(null)
+  const fromShape = useRef('inset(88% 40% 3% 40% round 22px)')
 
-  const open = () => {
-    if (mode !== 'moby') return
+  // Прямоугольник элемента внутри экрана в виде clip-path, с которого начинается переход
+  const shapeOf = (el: HTMLElement | null) => {
     const root = rootRef.current?.getBoundingClientRect()
-    const btn = familyBtn.current?.getBoundingClientRect()
-    if (root && btn) setOrigin({ x: `${btn.left + btn.width / 2 - root.left}px`, y: `${btn.top + btn.height / 2 - root.top}px` })
+    const r = el?.getBoundingClientRect()
+    if (!root || !r) return fromShape.current
+    return `inset(${r.top - root.top}px ${root.right - r.right}px ${root.bottom - r.bottom}px ${r.left - root.left}px round 22px)`
+  }
+
+  const open = (from?: HTMLElement | null) => {
+    if (mode !== 'moby') return
+    fromShape.current = shapeOf(from ?? familyBtn.current)
     setTab('home')
     setMode('opening')
-    window.setTimeout(() => setMode('family'), OPEN_MS)
   }
   const close = () => {
+    if (mode !== 'family') return
     setMode('closing')
-    window.setTimeout(() => { setMode('moby'); setMobyTab('home') }, CLOSE_MS)
   }
+
+  useLayoutEffect(() => {
+    const full = 'inset(0px 0px 0px 0px round 0px)'
+    if (mode === 'opening') {
+      layerRef.current?.animate([{ clipPath: fromShape.current }, { clipPath: full }], { duration: OPEN_MS, easing: EASE, fill: 'both' })
+      contentRef.current?.animate([{ transform: 'scale(.9)', opacity: 0 }, { transform: 'scale(1)', opacity: 1 }], { duration: OPEN_MS, easing: EASE, fill: 'both' })
+      // синяя «иконка» раздела, которая тает по мере раскрытия
+      coverRef.current?.animate([{ opacity: 1 }, { opacity: 0, offset: 0.45 }, { opacity: 0 }], { duration: OPEN_MS, easing: 'ease-out', fill: 'both' })
+      mobyRef.current?.animate([{ transform: 'scale(1)', filter: 'brightness(1)', borderRadius: '0px' }, { transform: 'scale(.93)', filter: 'brightness(.55)', borderRadius: '32px' }], { duration: OPEN_MS, easing: EASE, fill: 'forwards' })
+      const t = window.setTimeout(() => setMode('family'), OPEN_MS)
+      return () => window.clearTimeout(t)
+    }
+    if (mode === 'closing') {
+      layerRef.current?.animate([{ clipPath: full }, { clipPath: fromShape.current }], { duration: CLOSE_MS, easing: EASE, fill: 'both' })
+      contentRef.current?.animate([{ transform: 'scale(1)', opacity: 1 }, { transform: 'scale(.9)', opacity: 0 }], { duration: CLOSE_MS, easing: EASE, fill: 'both' })
+      coverRef.current?.animate([{ opacity: 0 }, { opacity: 0, offset: 0.5 }, { opacity: 1 }], { duration: CLOSE_MS, easing: 'ease-in', fill: 'both' })
+      mobyRef.current?.animate([{ transform: 'scale(.93)', filter: 'brightness(.55)', borderRadius: '32px' }, { transform: 'scale(1)', filter: 'brightness(1)', borderRadius: '0px' }], { duration: CLOSE_MS, easing: EASE, fill: 'forwards' })
+      const t = window.setTimeout(() => {
+        mobyRef.current?.getAnimations().forEach((a) => a.cancel())
+        setMode('moby')
+        setMobyTab('home')
+      }, CLOSE_MS)
+      return () => window.clearTimeout(t)
+    }
+  }, [mode])
 
   const pick = (t: MobyTab) => {
     if (t === 'family') open()
@@ -157,7 +194,7 @@ export function MobyShell({ name, family }: { name: string; family: (onExit: () 
 
   return (
     <div ref={rootRef} className="relative flex min-h-0 flex-1 flex-col overflow-hidden bg-black">
-      <div className={`moby-layer flex min-h-0 flex-1 flex-col bg-surface ${mode !== 'moby' ? 'moby-behind' : ''}`}>
+      <div ref={mobyRef} className="flex min-h-0 flex-1 flex-col overflow-hidden bg-surface" style={{ transformOrigin: '50% 60%' }}>
         <div className="flex-1 overflow-y-auto">
           {tab === 'home' && <MobyHome name={name} onFamily={open} />}
           {tab === 'products' && <MobyStub title="Продукты" />}
@@ -168,12 +205,12 @@ export function MobyShell({ name, family }: { name: string; family: (onExit: () 
       </div>
 
       {mode !== 'moby' && (
-        <div
-          className={`absolute inset-0 z-10 flex flex-col bg-surface ${mode === 'opening' ? 'family-open' : mode === 'closing' ? 'family-close' : ''}`}
-          style={{ ['--ox' as string]: origin.x, ['--oy' as string]: origin.y }}
-        >
-          <div className={`flex min-h-0 flex-1 flex-col ${mode === 'opening' ? 'family-content-in' : ''}`}>
+        <div ref={layerRef} className="absolute inset-0 z-10 flex flex-col overflow-hidden bg-surface" style={{ clipPath: fromShape.current }}>
+          <div ref={contentRef} className="flex min-h-0 flex-1 flex-col" style={{ transformOrigin: '50% 100%' }}>
             {family(close)}
+          </div>
+          <div ref={coverRef} className="pointer-events-none absolute inset-0 flex items-center justify-center text-white" style={{ background: 'linear-gradient(180deg, #2F6BE6, #2334C8)' }}>
+            <IcFamily />
           </div>
         </div>
       )}

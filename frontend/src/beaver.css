@@ -32,13 +32,3 @@
 .reveal-btn { animation: speech-in .25s ease-out both, reveal-pulse 1.5s .3s ease-out infinite; }
 @keyframes chip-in { from { opacity: 0; transform: translateY(-8px) } to { opacity: 1; transform: none } }
 .chip-in { animation: chip-in .4s 1.4s ease-out both; }
-
-/* Moby → «Семья»: круг раскрывается из вкладки, Moby уходит вглубь */
-.moby-layer { transition: transform .6s cubic-bezier(.7,0,.2,1), filter .6s ease, border-radius .6s ease; transform-origin: 50% 100%; }
-.moby-behind { transform: scale(.92); filter: brightness(.7); border-radius: 28px; }
-@keyframes family-open { from { clip-path: circle(0px at var(--ox) var(--oy)); } to { clip-path: circle(150% at var(--ox) var(--oy)); } }
-@keyframes family-close { from { clip-path: circle(150% at var(--ox) var(--oy)); } to { clip-path: circle(0px at var(--ox) var(--oy)); } }
-.family-open { animation: family-open .65s cubic-bezier(.7,0,.2,1) both; }
-.family-close { animation: family-close .52s cubic-bezier(.6,0,.3,1) both; }
-@keyframes family-content-in { from { transform: translateY(24px) scale(.97); opacity: .4 } to { transform: none; opacity: 1 } }
-.family-content-in { animation: family-content-in .65s cubic-bezier(.2,.8,.2,1) both; }
