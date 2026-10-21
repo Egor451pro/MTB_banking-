@@ -156,7 +156,9 @@ class PaymentService:
             category_spent = await UserService.calculate_spent_today_cents(
                 db=db, account_id=account.id, category=request.category
             )
-            if category_spent + request.amount_cents > category_limit.amount_cents:
+            # разовая добавка родителя действует и на лимит категории: иначе покупка всё равно не пройдёт
+            extra_today = await UserService.extra_limit_today_cents(db, account.owner_id)
+            if category_spent + request.amount_cents > category_limit.amount_cents + extra_today:
                 return await PaymentService._save_and_response(
                     db=db,
                     account=account,
