@@ -5,13 +5,13 @@ import { useData } from '../hooks'
 import { Icon, type IconName } from '../icons'
 import { useNav } from '../nav'
 import {
-  Avatar, Badge, CARD_ART, Btn, Card, Empty, Field, Header, IconTile, Loading, Note,
+  Avatar, Badge, Btn, Card, Empty, Field, Header, IconTile, Loading, Note,
   Row, Section, Sheet, bonusBanner, toast,
 } from '../ui'
 import type { Category, DeclineReason, LessonResult, PayResult, PermissionKey, ReqType } from '../types'
 import { GoalCard, REQ_ICON, TaskHead, TxList, requestText } from './shared'
 import { MIN_GOAL_CENTS } from '../beaverState'
-import { CardEntry, CardsCarousel, CardFace, LimitStrip } from './vcard'
+import { CardEntry, CardsCarousel, KidMainCard } from './vcard'
 import { BeaverPanel, LOGS_PER_LESSON, damSrc, logWord, useBeaverInfo } from './beaver'
 
 // ───────── Главная ребёнка ─────────
@@ -37,7 +37,7 @@ export function ChildHome({ meId }: { meId: number }) {
       <div className="-mt-12 space-y-5 px-4 pb-6">
         {c.age_group === '14-17'
           ? <CardsCarousel meId={meId} card={c.card} limit={c.limits_today} />
-          : <div className="space-y-3"><CardFace art={CARD_ART.kid} card={c.card} label="Моя карта" chipTop /><LimitStrip limit={c.limits_today} blocked={c.card.status === 'blocked'} /></div>}
+          : <KidMainCard meId={meId} card={c.card} limit={c.limits_today} />}
 
         <div className="grid grid-cols-4 gap-2">
           {actions.map((a) => (

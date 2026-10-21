@@ -6,7 +6,7 @@ import { Icon } from '../icons'
 import { useNav } from '../nav'
 import { BalanceCard, Btn, CARD_ART, ConfirmBtn, Card, Field, Header, Loading, Note, Progress, Row, Sheet, toast } from '../ui'
 import type { Card as CardT, VirtualCard } from '../types'
-import { TEEN_DESIGNS, useCardDesign, type CardSlot } from '../cardDesigns'
+import { KID_DESIGNS, TEEN_DESIGNS, useCardDesign, type CardDesign, type CardSlot } from '../cardDesigns'
 import '../beaver.css'
 
 // Виртуальная карта подростка (14–17 лет): выпуск в приложении, данные карты, заморозка,
@@ -293,27 +293,74 @@ export function CardEntry({ meId, variant }: { meId: number; variant: 'home' | '
 }
 
 
-// ───────── Выбор дизайна карты (14–17 лет) ─────────
-export function DesignPicker({ open, onClose, childId, slot, title }: { open: boolean; onClose: () => void; childId: number; slot: CardSlot; title: string }) {
-  const [cur, set] = useCardDesign(childId, slot)
+// ───────── Выбор дизайна карты ─────────
+// 14–17: свои дизайны и одна плашка «Детские», внутри те же, что у малышей. 7–13: только детские.
+function DesignTile({ d, on, onPick }: { d: CardDesign; on: boolean; onPick: () => void }) {
   return (
-    <Sheet open={open} onClose={onClose} title={title}>
+    <button type="button" onClick={onPick} aria-label={`Дизайн «${d.name}»`} aria-pressed={on}
+      className={`relative overflow-hidden rounded-[16px] bg-black text-left ring-2 transition active:scale-[0.98] ${on ? 'ring-mt-blue' : 'ring-transparent'}`}>
+      <div style={{ aspectRatio: 1.65 }} className="w-full overflow-hidden">
+        <img src={d.src} alt="" draggable={false} className="h-full w-full object-cover" />
+      </div>
+      <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/70 to-transparent px-2.5 pb-1.5 pt-5 text-[12px] font-semibold text-white">{d.name}</div>
+      {on && <div className="absolute right-2 top-2 flex h-6 w-6 items-center justify-center rounded-full bg-mt-blue text-white"><Icon name="check" size={14} /></div>}
+    </button>
+  )
+}
+
+export function DesignPicker({ open, onClose, childId, slot, title, kind = 'teen', defaultId }: {
+  open: boolean; onClose: () => void; childId: number; slot: CardSlot; title: string; kind?: 'teen' | 'kid'; defaultId?: string
+}) {
+  const [cur, set] = useCardDesign(childId, slot, defaultId)
+  const [kids, setKids] = useState(kind === 'kid')
+  useEffect(() => { if (open) setKids(kind === 'kid') }, [open, kind])
+  const list = kids ? KID_DESIGNS : TEEN_DESIGNS
+  const pick = (id: string) => { set(id); onClose() }
+  const curIsKid = KID_DESIGNS.some((d) => d.id === cur.id)
+  return (
+    <Sheet open={open} onClose={onClose} title={kids && kind === 'teen' ? 'Детские дизайны' : title}>
       <div className="grid grid-cols-2 gap-3 pb-2">
-        {TEEN_DESIGNS.map((d) => {
-          const on = d.id === cur.id
-          return (
-            <button key={d.id} type="button" onClick={() => { set(d.id); onClose() }} aria-label={`Дизайн «${d.name}»`} aria-pressed={on}
-              className={`relative overflow-hidden rounded-[16px] bg-black text-left ring-2 transition active:scale-[0.98] ${on ? 'ring-mt-blue' : 'ring-transparent'}`}>
-              <div style={{ aspectRatio: 1.65 }} className="w-full overflow-hidden">
-                <img src={d.src} alt="" draggable={false} className="h-full w-full object-cover" />
-              </div>
-              <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/70 to-transparent px-2.5 pb-1.5 pt-5 text-[12px] font-semibold text-white">{d.name}</div>
-              {on && <div className="absolute right-2 top-2 flex h-6 w-6 items-center justify-center rounded-full bg-mt-blue text-white"><Icon name="check" size={14} /></div>}
-            </button>
-          )
-        })}
+        {kids && kind === 'teen' && (
+          <button type="button" onClick={() => setKids(false)} style={{ gridColumn: 'span 2' }} className="col-span-2 flex items-center gap-1 text-left text-[14px] font-semibold text-mt-blue">
+            <Icon name="chevron-left" size={18} />Назад ко всем дизайнам
+          </button>
+        )}
+        {!kids && kind === 'teen' && (
+          <button type="button" onClick={() => setKids(true)} aria-label="Детские дизайны" style={{ gridColumn: 'span 2' }}
+            className={`relative col-span-2 flex items-center gap-3 overflow-hidden rounded-[16px] bg-card p-2 text-left ring-2 transition active:scale-[0.99] ${curIsKid ? 'ring-mt-blue' : 'ring-line'}`}>
+            <div className="flex shrink-0">
+              {KID_DESIGNS.slice(0, 3).map((d, i) => (
+                <img key={d.id} src={d.src} alt="" draggable={false} style={{ zIndex: 3 - i, height: 52, width: 86, marginLeft: i ? -24 : 0 }} className="h-[52px] w-[86px] rounded-[10px] object-cover ring-2 ring-card" />
+              ))}
+            </div>
+            <div className="min-w-0 flex-1">
+              <div className="text-[15px] font-semibold text-mt-ink">Детские</div>
+              <div className="text-[12px] text-muted">Дизайны карт для 7–13 лет, их тоже можно выбрать</div>
+            </div>
+            <Icon name="chevron-right" size={20} className="text-[#9AA6B8]" />
+          </button>
+        )}
+        {list.map((d) => <DesignTile key={d.id} d={d} on={d.id === cur.id} onPick={() => pick(d.id)} />)}
       </div>
     </Sheet>
+  )
+}
+
+// Основная карта малыша (7–13) с выбором дизайна
+export function KidMainCard({ meId, card, limit }: { meId: number; card: CardT; limit?: LimitToday }) {
+  const [d] = useCardDesign(meId, 'main', 'kid')
+  const [open, setOpen] = useState(false)
+  return (
+    <div className="space-y-3">
+      <CardFace art={d.src} card={card} label="Моя карта" chipTop />
+      <div className="flex justify-center">
+        <button type="button" onClick={() => setOpen(true)} className="flex items-center gap-1.5 rounded-full bg-card px-3.5 py-1.5 text-[13px] font-semibold text-mt-blue ring-1 ring-line transition active:scale-[0.97]">
+          <Icon name="star" size={15} />Сменить дизайн
+        </button>
+      </div>
+      <LimitStrip limit={limit} blocked={card.status === 'blocked'} />
+      <DesignPicker open={open} onClose={() => setOpen(false)} childId={meId} slot="main" kind="kid" defaultId="kid" title="Дизайн карты" />
+    </div>
   )
 }
 
