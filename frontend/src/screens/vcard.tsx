@@ -6,6 +6,7 @@ import { Icon } from '../icons'
 import { useNav } from '../nav'
 import { BalanceCard, Btn, CARD_ART, ConfirmBtn, Card, Field, Header, Loading, Note, Progress, Row, Sheet, toast } from '../ui'
 import type { Card as CardT, VirtualCard } from '../types'
+import { TEEN_DESIGNS, useCardDesign, type CardSlot } from '../cardDesigns'
 import '../beaver.css'
 
 // Виртуальная карта подростка (14–17 лет): выпуск в приложении, данные карты, заморозка,
@@ -14,12 +15,12 @@ import '../beaver.css'
 const groups = (n: string) => n.replace(/\D/g, '').replace(/(.{4})/g, '$1 ').trim()
 
 /** Карта в фирменном дизайне. Номер и имя пишем поверх чистой синей части картинки. */
-export function CardArt({ holder, last4, expires, frozen, mini, className = '' }: {
-  holder?: string | null; last4?: string | null; expires?: string | null; frozen?: boolean; mini?: boolean; className?: string
+export function CardArt({ holder, last4, expires, frozen, mini, className = '', art }: {
+  holder?: string | null; last4?: string | null; expires?: string | null; frozen?: boolean; mini?: boolean; className?: string; art?: string
 }) {
   return (
     <div className={`relative aspect-[1280/805] w-full overflow-hidden rounded-[20px] shadow-[0_18px_36px_-18px_rgba(20,30,80,0.6)] ${className}`}>
-      <img src={CARD_ART.virtual} alt="Виртуальная карта МТБанка" draggable={false}
+      <img src={art ?? CARD_ART.virtual} alt="Виртуальная карта МТБанка" draggable={false}
         className={`absolute inset-0 h-full w-full object-cover transition ${frozen ? 'grayscale brightness-75' : ''}`} />
       {!mini && <div className="absolute inset-x-0 bottom-0 p-[5%] text-white [text-shadow:0_1px_6px_rgba(0,0,0,0.5)]">
         <div className="font-display text-[15px] font-semibold tabular-nums tracking-[0.2em]">{last4 ? `•••• ${last4}` : '•••• ••••'}</div>
@@ -56,6 +57,8 @@ export function VirtualCardScreen({ meId, ageGroup }: { meId: number; ageGroup: 
   const [shownUntil, setShownUntil] = useState(0)     // когда спрятать данные карты
   const [, tick] = useState(0)
   const [plastic, setPlastic] = useState(false)
+  const [vDesign] = useCardDesign(meId, 'virtual')
+  const [pickOpen, setPickOpen] = useState(false)
   const [method, setMethod] = useState<'pickup' | 'delivery'>('pickup')
   const [address, setAddress] = useState('')
   const [xfer, setXfer] = useState(false)
@@ -115,7 +118,7 @@ export function VirtualCardScreen({ meId, ageGroup }: { meId: number; ageGroup: 
       <>
         <Header title="Виртуальная карта" subtitle="Карта МТБанка в телефоне" onBack={back} />
         <div className="space-y-4 p-4">
-          <CardArt holder={(holder || c.name).toUpperCase()} className={v.available ? '' : 'opacity-60 grayscale'} />
+          <CardArt art={vDesign.src} holder={(holder || c.name).toUpperCase()} className={v.available ? '' : 'opacity-60 grayscale'} />
           {v.available ? (
             <Card className="space-y-4">
               <Field label="Имя на карте" value={holder} onChange={setHolder} placeholder={c.name} />
@@ -141,8 +144,10 @@ export function VirtualCardScreen({ meId, ageGroup }: { meId: number; ageGroup: 
       <Header title="Виртуальная карта" subtitle="Карта МТБанка в телефоне" onBack={back} />
       <div className="space-y-4 p-4">
         <div className={fresh ? 'card-in' : ''}>
-          <CardArt holder={v.holder} last4={v.last4} expires={showing ? v.expires : null} frozen={frozen} />
+          <CardArt art={vDesign.src} holder={v.holder} last4={v.last4} expires={showing ? v.expires : null} frozen={frozen} />
         </div>
+        <Btn tone="secondary" icon="star" onClick={() => setPickOpen(true)}>Дизайн карты</Btn>
+        <DesignPicker open={pickOpen} onClose={() => setPickOpen(false)} childId={meId} slot="virtual" title="Дизайн виртуальной карты" />
 
         <div className="grid grid-cols-2 gap-2">
           <Btn tone="secondary" icon="shield" onClick={() => setShownUntil(showing ? 0 : Date.now() + 15000)}>{showing ? 'Скрыть' : 'Данные'}</Btn>
@@ -260,6 +265,7 @@ export function VirtualCardScreen({ meId, ageGroup }: { meId: number; ageGroup: 
 export function CardEntry({ meId, variant }: { meId: number; variant: 'home' | 'row' }) {
   const { push } = useNav()
   const { data: v, error } = useData(() => api.getVirtualCard(meId), [meId], 4000)
+  const [entryArt] = useCardDesign(meId, 'virtual')
   if (!v && !error) return null
   if (!v) {
     // сервер не ответил (например, бэкенд запущен со старым кодом): показываем причину вместо пустого места
@@ -276,7 +282,7 @@ export function CardEntry({ meId, variant }: { meId: number; variant: 'home' | '
   }
   return (
     <button type="button" onClick={go} className="flex w-full items-center gap-3 rounded-[20px] bg-card p-3 text-left transition active:scale-[0.99]">
-      <div className="w-16 shrink-0"><CardArt mini frozen={v.status === 'frozen'} className="!rounded-[10px] !shadow-none" /></div>
+      <div className="w-16 shrink-0"><CardArt art={entryArt.src} mini frozen={v.status === 'frozen'} className="!rounded-[10px] !shadow-none" /></div>
       <div className="min-w-0 flex-1">
         <div className="text-[15px] font-semibold text-mt-ink">Виртуальная карта</div>
         <div className="text-[13px] text-muted">{sub}</div>
@@ -286,6 +292,30 @@ export function CardEntry({ meId, variant }: { meId: number; variant: 'home' | '
   )
 }
 
+
+// ───────── Выбор дизайна карты (14–17 лет) ─────────
+export function DesignPicker({ open, onClose, childId, slot, title }: { open: boolean; onClose: () => void; childId: number; slot: CardSlot; title: string }) {
+  const [cur, set] = useCardDesign(childId, slot)
+  return (
+    <Sheet open={open} onClose={onClose} title={title}>
+      <div className="grid grid-cols-2 gap-3 pb-2">
+        {TEEN_DESIGNS.map((d) => {
+          const on = d.id === cur.id
+          return (
+            <button key={d.id} type="button" onClick={() => { set(d.id); onClose() }} aria-label={`Дизайн «${d.name}»`} aria-pressed={on}
+              className={`relative overflow-hidden rounded-[16px] bg-black text-left ring-2 transition active:scale-[0.98] ${on ? 'ring-mt-blue' : 'ring-transparent'}`}>
+              <div className="aspect-[1016/638] w-full overflow-hidden">
+                <img src={d.src} alt="" draggable={false} style={{ transform: 'scale(1.06)' }} className="h-full w-full object-cover" />
+              </div>
+              <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/70 to-transparent px-2.5 pb-1.5 pt-5 text-[12px] font-semibold text-white">{d.name}</div>
+              {on && <div className="absolute right-2 top-2 flex h-6 w-6 items-center justify-center rounded-full bg-mt-blue text-white"><Icon name="check" size={14} /></div>}
+            </button>
+          )
+        })}
+      </div>
+    </Sheet>
+  )
+}
 
 // ───────── Основная карта картинкой и лимит на сегодня (главная ребёнка) ─────────
 type LimitToday = { limit_cents: number | null; spent_cents: number; left_cents: number | null }
@@ -327,7 +357,10 @@ export function CardsCarousel({ meId, card, limit }: { meId: number; card: CardT
   const { data: v, error } = useData(() => api.getVirtualCard(meId), [meId], 4000)
   const track = useRef<HTMLDivElement>(null)
   const [idx, setIdx] = useState(0)
-  if (!v) return <div className="space-y-3"><BalanceCard card={card} title="Основная карта" limit={limit} art={CARD_ART.teen} />{error && <CardEntry meId={meId} variant="home" />}</div>
+  const [pickOpen, setPickOpen] = useState(false)
+  const [vDesign] = useCardDesign(meId, 'virtual')
+  const [mDesign] = useCardDesign(meId, 'main')
+  if (!v) return <div className="space-y-3"><BalanceCard card={card} title="Основная карта" limit={limit} art={mDesign.src} />{error && <CardEntry meId={meId} variant="home" />}</div>
 
   const onScroll = () => {
     const el = track.current
@@ -346,7 +379,7 @@ export function CardsCarousel({ meId, card, limit }: { meId: number; card: CardT
           className="flex snap-x snap-mandatory overflow-x-auto scroll-smooth [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
           <button type="button" onClick={() => push({ name: 'vcard' })} aria-label="Открыть виртуальную карту"
             className="relative block w-full shrink-0 snap-center snap-always text-left transition active:scale-[0.99]">
-            <CardArt holder={v.issued ? v.holder : null} last4={v.issued ? v.last4 : null} mini={!v.issued} frozen={frozen}
+            <CardArt art={vDesign.src} holder={v.issued ? v.holder : null} last4={v.issued ? v.last4 : null} mini={!v.issued} frozen={frozen}
               className={`!rounded-[24px] !shadow-none ${v.issued ? '' : 'grayscale'}`} />
             {v.issued ? (
               <div className="absolute bottom-3 right-3 rounded-2xl bg-black/45 px-3 py-1.5 text-right text-white backdrop-blur-sm">
@@ -360,7 +393,7 @@ export function CardsCarousel({ meId, card, limit }: { meId: number; card: CardT
               </div>
             )}
           </button>
-          <div className="w-full shrink-0 snap-center snap-always"><CardFace art={CARD_ART.teen} card={card} label="Основная" /></div>
+          <div className="w-full shrink-0 snap-center snap-always"><CardFace art={mDesign.src} card={card} label="Основная" /></div>
         </div>
         <div className="mt-3 flex justify-center gap-2">
           {[0, 1].map((i) => (
@@ -368,6 +401,12 @@ export function CardsCarousel({ meId, card, limit }: { meId: number; card: CardT
               className={`h-2 rounded-full transition-all ${idx === i ? 'w-6 bg-mt-blue' : 'w-2 bg-[#C9D1DE]'}`} />
           ))}
         </div>
+        <div className="mt-2 flex justify-center">
+          <button type="button" onClick={() => setPickOpen(true)} className="flex items-center gap-1.5 rounded-full bg-card px-3.5 py-1.5 text-[13px] font-semibold text-mt-blue ring-1 ring-line transition active:scale-[0.97]">
+            <Icon name="star" size={15} />Сменить дизайн
+          </button>
+        </div>
+        <DesignPicker open={pickOpen} onClose={() => setPickOpen(false)} childId={meId} slot={idx === 0 ? 'virtual' : 'main'} title={idx === 0 ? 'Дизайн виртуальной карты' : 'Дизайн основной карты'} />
       </div>
       <LimitStrip limit={limit} blocked={card.status === 'blocked'} />
     </div>
