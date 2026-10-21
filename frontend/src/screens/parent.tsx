@@ -5,7 +5,7 @@ import { useData } from '../hooks'
 import { Icon, type IconName } from '../icons'
 import { useNav } from '../nav'
 import {
-  Avatar, BalanceCard, Badge, Btn, Card, ConfirmBtn, Empty, Field, Header, IconTile, Loading, Note, Progress,
+  Avatar, BalanceCard, Badge, CARD_ART, Btn, Card, ConfirmBtn, Empty, Field, Header, IconTile, Loading, Note, Progress,
   Row, Section, Segmented, Sheet, Toggle, toast,
 } from '../ui'
 import type { Category, ConsentType, LimitItem } from '../types'
@@ -304,7 +304,7 @@ export function ChildManage({ id, switcher }: { id: number; switcher?: ReactNode
     <>
       <Header title={c.name} subtitle={ageLabel(c.age_group)} right={switcher} tall />
       <div className="-mt-12 space-y-4 px-4 pb-6">
-        <BalanceCard card={c.card} title="Детская карта" limit={c.limits_today} />
+        <BalanceCard card={c.card} title="Детская карта" limit={c.limits_today} art={c.age_group === '14-17' ? CARD_ART.teen : CARD_ART.kid} />
         <div className="grid grid-cols-2 gap-2">
           <Btn icon="wallet" onClick={() => setTopup(true)}>Пополнить</Btn>
           <ConfirmBtn ask={!blocked} title="Заблокировать карту?" text="Карта сразу перестанет работать: оплата и снятие будут недоступны. Разблокировать можно в любой момент." confirmLabel="Заблокировать" tone="danger" icon={blocked ? 'unlock' : 'lock'} onClick={async () => {

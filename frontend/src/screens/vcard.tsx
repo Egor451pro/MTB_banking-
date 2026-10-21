@@ -4,7 +4,7 @@ import { dateTime, money, toCents } from '../format'
 import { useData } from '../hooks'
 import { Icon } from '../icons'
 import { useNav } from '../nav'
-import { BalanceCard, Btn, ConfirmBtn, Card, Field, Header, Loading, Note, Progress, Row, Sheet, toast } from '../ui'
+import { BalanceCard, Btn, CARD_ART, ConfirmBtn, Card, Field, Header, Loading, Note, Progress, Row, Sheet, toast } from '../ui'
 import type { Card as CardT, VirtualCard } from '../types'
 import '../beaver.css'
 
@@ -19,7 +19,7 @@ export function CardArt({ holder, last4, expires, frozen, mini, className = '' }
 }) {
   return (
     <div className={`relative aspect-[1280/805] w-full overflow-hidden rounded-[20px] shadow-[0_18px_36px_-18px_rgba(20,30,80,0.6)] ${className}`}>
-      <img src="/card/graduate.jpg" alt="Виртуальная карта МТБанка с бобром" draggable={false}
+      <img src={CARD_ART.virtual} alt="Виртуальная карта МТБанка" draggable={false}
         className={`absolute inset-0 h-full w-full object-cover transition ${frozen ? 'grayscale brightness-75' : ''}`} />
       {!mini && <div className="absolute inset-x-0 bottom-0 p-[5%] text-white [text-shadow:0_1px_6px_rgba(0,0,0,0.5)]">
         <div className="font-display text-[15px] font-semibold tabular-nums tracking-[0.2em]">{last4 ? `•••• ${last4}` : '•••• ••••'}</div>
@@ -287,27 +287,47 @@ export function CardEntry({ meId, variant }: { meId: number; variant: 'home' | '
 }
 
 
-// ───────── Карусель карт на главной подростка: основная ⇄ виртуальная свайпом ─────────
+// ───────── Основная карта картинкой и лимит на сегодня (главная ребёнка) ─────────
 type LimitToday = { limit_cents: number | null; spent_cents: number; left_cents: number | null }
 
+export function CardFace({ art, card, label, chipTop }: { art: string; card: CardT; label: string; chipTop?: boolean }) {
+  const blocked = card.status === 'blocked'
+  const zoom = art === CARD_ART.kid ? 1.13 : 1.06
+  return (
+    <div className="relative">
+      <div className={`relative aspect-[1016/638] w-full overflow-hidden rounded-[24px] bg-black ${blocked ? 'grayscale brightness-75' : ''}`}>
+        <img src={art} alt={label} draggable={false} style={{ transform: `scale(${zoom})` }} className="h-full w-full object-cover" />
+      </div>
+      <div className={`absolute ${chipTop ? 'right-3 top-3' : 'bottom-3 left-3'} rounded-2xl bg-black/45 px-3 py-1.5 text-white backdrop-blur-sm`}>
+        <div className="text-[10px] font-semibold uppercase tracking-wide text-white/75">{blocked ? 'Заблокирована' : label} •• {card.last4}</div>
+        <div className="font-display text-[17px] font-bold tabular-nums">{money(card.balance_cents)}</div>
+      </div>
+    </div>
+  )
+}
+
+export function LimitStrip({ limit, blocked }: { limit?: LimitToday; blocked?: boolean }) {
+  if (!limit || blocked) return null
+  if (limit.limit_cents == null) return <div className="rounded-[20px] bg-card p-4 text-sm text-muted ring-1 ring-line">Дневной лимит не установлен</div>
+  return (
+    <div className="space-y-2 rounded-[20px] bg-card p-4 ring-1 ring-line">
+      <div className="flex items-baseline justify-between text-sm">
+        <span className="text-muted">Можно потратить сегодня</span>
+        <span className="font-semibold tabular-nums text-mt-ink">{money(limit.left_cents ?? 0)}</span>
+      </div>
+      <Progress value={limit.left_cents ?? 0} max={limit.limit_cents} />
+      <div className="text-xs tabular-nums text-muted">Лимит {money(limit.limit_cents)} в день · потрачено {money(limit.spent_cents)}</div>
+    </div>
+  )
+}
+
+// ───────── Карусель карт подростка (14–17): виртуальная по умолчанию ⇄ основная, свайпом ─────────
 export function CardsCarousel({ meId, card, limit }: { meId: number; card: CardT; limit?: LimitToday }) {
   const { push } = useNav()
   const { data: v, error } = useData(() => api.getVirtualCard(meId), [meId], 4000)
   const track = useRef<HTMLDivElement>(null)
   const [idx, setIdx] = useState(0)
-  const mainBlocked = card.status === 'blocked'
-  const main = (
-    <div className="relative">
-      <div className={`relative aspect-[1016/638] w-full overflow-hidden rounded-[24px] bg-black ${mainBlocked ? 'grayscale brightness-75' : ''}`}>
-        <img src="/card/main.jpg" alt="Основная карта МТБанка" draggable={false} className="h-full w-full scale-[1.06] object-cover" />
-      </div>
-      <div className="absolute bottom-3 left-3 rounded-2xl bg-white/15 px-3 py-1.5 text-white backdrop-blur-sm">
-        <div className="text-[10px] font-semibold uppercase tracking-wide text-white/70">{mainBlocked ? 'Заблокирована' : 'Основная'} •• {card.last4}</div>
-        <div className="font-display text-[17px] font-bold tabular-nums">{money(card.balance_cents)}</div>
-      </div>
-    </div>
-  )
-  if (!v) return <div className="space-y-3"><BalanceCard card={card} title="Основная карта" limit={limit} />{error && <CardEntry meId={meId} variant="home" />}</div>
+  if (!v) return <div className="space-y-3"><BalanceCard card={card} title="Основная карта" limit={limit} art={CARD_ART.teen} />{error && <CardEntry meId={meId} variant="home" />}</div>
 
   const onScroll = () => {
     const el = track.current
@@ -320,43 +340,36 @@ export function CardsCarousel({ meId, card, limit }: { meId: number; card: CardT
   const frozen = v.status === 'frozen'
 
   return (
-    <div>
-      <div ref={track} onScroll={onScroll}
-        className="flex snap-x snap-mandatory overflow-x-auto scroll-smooth [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-        <div className="w-full shrink-0 snap-center snap-always">{main}</div>
-        <button type="button" onClick={() => push({ name: 'vcard' })} aria-label="Открыть виртуальную карту"
-          className="relative block w-full shrink-0 snap-center snap-always text-left transition active:scale-[0.99]">
-          <CardArt holder={v.issued ? v.holder : null} last4={v.issued ? v.last4 : null} mini={!v.issued} frozen={frozen}
-            className={`!rounded-[24px] !shadow-none ${v.issued ? '' : 'grayscale'}`} />
-          {v.issued ? (
-            <div className="absolute right-3 top-3 rounded-full bg-black/45 px-3 py-1.5 text-white backdrop-blur-sm">
-              <div className="text-[10px] font-semibold uppercase tracking-wide text-white/70">Баланс карты</div>
-              <div className="font-display text-[17px] font-bold tabular-nums">{money(v.balance_cents)}</div>
-            </div>
-          ) : (
-            <div className="absolute inset-0 flex flex-col items-center justify-center gap-1 rounded-[24px] bg-black/55 px-6 text-center text-white">
-              <div className="font-display text-[20px] font-bold">Виртуальная карта</div>
-              <div className="text-sm">{v.available ? 'Нажми, чтобы выпустить бесплатно за минуту' : v.locked_reason ?? ''}</div>
-            </div>
-          )}
-        </button>
-      </div>
-      <div className="mt-3 flex justify-center gap-2">
-        {[0, 1].map((i) => (
-          <button key={i} type="button" onClick={() => goTo(i)} aria-label={i === 0 ? 'Основная карта' : 'Виртуальная карта'}
-            className={`h-2 rounded-full transition-all ${idx === i ? 'w-6 bg-mt-blue' : 'w-2 bg-[#C9D1DE]'}`} />
-        ))}
-      </div>
-      {limit && limit.limit_cents != null && !mainBlocked && (
-        <div className="mt-3 space-y-2 rounded-[20px] bg-card p-4 ring-1 ring-line">
-          <div className="flex items-baseline justify-between text-sm">
-            <span className="text-muted">Можно потратить сегодня</span>
-            <span className="font-semibold tabular-nums text-mt-ink">{money(limit.left_cents ?? 0)}</span>
-          </div>
-          <Progress value={limit.left_cents ?? 0} max={limit.limit_cents} />
-          <div className="text-xs tabular-nums text-muted">Лимит {money(limit.limit_cents)} в день · потрачено {money(limit.spent_cents)}</div>
+    <div className="space-y-3">
+      <div>
+        <div ref={track} onScroll={onScroll}
+          className="flex snap-x snap-mandatory overflow-x-auto scroll-smooth [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+          <button type="button" onClick={() => push({ name: 'vcard' })} aria-label="Открыть виртуальную карту"
+            className="relative block w-full shrink-0 snap-center snap-always text-left transition active:scale-[0.99]">
+            <CardArt holder={v.issued ? v.holder : null} last4={v.issued ? v.last4 : null} mini={!v.issued} frozen={frozen}
+              className={`!rounded-[24px] !shadow-none ${v.issued ? '' : 'grayscale'}`} />
+            {v.issued ? (
+              <div className="absolute bottom-3 right-3 rounded-2xl bg-black/45 px-3 py-1.5 text-right text-white backdrop-blur-sm">
+                <div className="text-[10px] font-semibold uppercase tracking-wide text-white/75">Виртуальная</div>
+                <div className="font-display text-[17px] font-bold tabular-nums">{money(v.balance_cents)}</div>
+              </div>
+            ) : (
+              <div className="absolute inset-0 flex flex-col items-center justify-center gap-1 rounded-[24px] bg-black/55 px-6 text-center text-white">
+                <div className="font-display text-[20px] font-bold">Виртуальная карта</div>
+                <div className="text-sm">{v.available ? 'Нажми, чтобы выпустить бесплатно за минуту' : v.locked_reason ?? ''}</div>
+              </div>
+            )}
+          </button>
+          <div className="w-full shrink-0 snap-center snap-always"><CardFace art={CARD_ART.teen} card={card} label="Основная" /></div>
         </div>
-      )}
+        <div className="mt-3 flex justify-center gap-2">
+          {[0, 1].map((i) => (
+            <button key={i} type="button" onClick={() => goTo(i)} aria-label={i === 0 ? 'Виртуальная карта' : 'Основная карта'}
+              className={`h-2 rounded-full transition-all ${idx === i ? 'w-6 bg-mt-blue' : 'w-2 bg-[#C9D1DE]'}`} />
+          ))}
+        </div>
+      </div>
+      <LimitStrip limit={limit} blocked={card.status === 'blocked'} />
     </div>
   )
 }

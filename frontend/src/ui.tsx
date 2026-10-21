@@ -391,25 +391,28 @@ export function MoneyBig({ cents, muted }: { cents: number; muted?: boolean }) {
   )
 }
 
-// Миниатюра основной карты МТБанка, как у счёта в Moby
-export function MiniCard({ last4, blocked }: { last4: string; blocked?: boolean }) {
+// Дизайны карт: детская (7–13), основная подростка (14–17) и виртуальная (чёрная фирменная МТБанка)
+export const CARD_ART = { kid: '/card/kid.jpg', teen: '/card/graduate.jpg', virtual: '/card/main.jpg' } as const
+
+// Миниатюра основной карты ребёнка, как у счёта в Moby
+export function MiniCard({ last4, blocked, art = CARD_ART.kid }: { last4: string; blocked?: boolean; art?: string }) {
   return (
     <div className="relative h-[46px] w-[72px] shrink-0 overflow-hidden rounded-[10px] bg-[#0B0B12]">
-      <img src="/card/main.jpg" alt="" draggable={false} className={`h-full w-full object-cover ${blocked ? 'opacity-60 grayscale' : ''}`} />
-      <div className="absolute bottom-1 left-1.5 text-[9px] font-semibold tracking-wider text-white/90">•• {last4}</div>
+      <img src={art} alt="" draggable={false} style={{ transform: `scale(${art === CARD_ART.kid ? 1.13 : 1.06})` }} className={`h-full w-full object-cover ${blocked ? 'opacity-60 grayscale' : ''}`} />
+      <div className="absolute bottom-1 left-1.5 text-[9px] font-semibold tracking-wider text-white [text-shadow:0_1px_3px_rgba(0,0,0,0.7)]">•• {last4}</div>
     </div>
   )
 }
 
-export function BalanceCard({ card, title, limit }: {
-  card: CardT; title: string
+export function BalanceCard({ card, title, limit, art }: {
+  card: CardT; title: string; art?: string
   limit?: { limit_cents: number | null; spent_cents: number; left_cents: number | null }
 }) {
   const blocked = card.status === 'blocked'
   return (
     <div className="rounded-[24px] bg-card p-5 shadow-sm ring-1 ring-line">
       <div className="flex items-center gap-4">
-        <MiniCard last4={card.last4} blocked={blocked} />
+        <MiniCard last4={card.last4} blocked={blocked} art={art} />
         <div className="min-w-0 flex-1">
           <div className="text-xs font-semibold uppercase tracking-wide text-[#A3ABB8]">{title}</div>
           <MoneyBig cents={card.balance_cents} muted={blocked} />
