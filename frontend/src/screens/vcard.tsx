@@ -4,7 +4,7 @@ import { dateTime, money, toCents } from '../format'
 import { useData } from '../hooks'
 import { Icon } from '../icons'
 import { useNav } from '../nav'
-import { BalanceCard, Btn, ConfirmBtn, Card, Field, Header, Loading, MoneyBig, Note, Row, Sheet, toast } from '../ui'
+import { BalanceCard, Btn, ConfirmBtn, Card, Field, Header, Loading, Note, Progress, Row, Sheet, toast } from '../ui'
 import type { Card as CardT, VirtualCard } from '../types'
 import '../beaver.css'
 
@@ -295,8 +295,19 @@ export function CardsCarousel({ meId, card, limit }: { meId: number; card: CardT
   const { data: v, error } = useData(() => api.getVirtualCard(meId), [meId], 4000)
   const track = useRef<HTMLDivElement>(null)
   const [idx, setIdx] = useState(0)
-  const main = <BalanceCard card={card} title="Основная карта" limit={limit} />
-  if (!v) return <div className="space-y-3">{main}{error && <CardEntry meId={meId} variant="home" />}</div>
+  const mainBlocked = card.status === 'blocked'
+  const main = (
+    <div className="relative">
+      <div className={`relative aspect-[1016/638] w-full overflow-hidden rounded-[24px] bg-black shadow-[0_18px_36px_-18px_rgba(20,30,80,0.6)] ${mainBlocked ? 'grayscale brightness-75' : ''}`}>
+        <img src="/card/main.jpg" alt="Основная карта МТБанка" draggable={false} className="h-full w-full object-cover" />
+      </div>
+      <div className="absolute bottom-3 left-3 rounded-2xl bg-white/15 px-3 py-1.5 text-white backdrop-blur-sm">
+        <div className="text-[10px] font-semibold uppercase tracking-wide text-white/70">{mainBlocked ? 'Заблокирована' : 'Основная'} •• {card.last4}</div>
+        <div className="font-display text-[17px] font-bold tabular-nums">{money(card.balance_cents)}</div>
+      </div>
+    </div>
+  )
+  if (!v) return <div className="space-y-3"><BalanceCard card={card} title="Основная карта" limit={limit} />{error && <CardEntry meId={meId} variant="home" />}</div>
 
   const onScroll = () => {
     const el = track.current
@@ -313,24 +324,21 @@ export function CardsCarousel({ meId, card, limit }: { meId: number; card: CardT
       <div ref={track} onScroll={onScroll}
         className="-mx-4 flex gap-3 snap-x snap-mandatory overflow-x-auto scroll-smooth px-4 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
         <div className="w-full shrink-0 snap-center">{main}</div>
-        <button type="button" onClick={() => push({ name: 'vcard' })}
-          className="flex w-full shrink-0 snap-center flex-col rounded-[24px] bg-card p-5 text-left shadow-sm ring-1 ring-line transition active:scale-[0.99]"
-          aria-label="Открыть виртуальную карту">
-          <div className="flex items-center gap-4">
-            {v.issued
-              ? <div className="w-[72px] shrink-0"><CardArt mini frozen={frozen} className="!rounded-[10px] !shadow-none" /></div>
-              : <div className="w-[72px] shrink-0"><CardArt mini frozen className="!rounded-[10px] !shadow-none" /></div>}
-            <div className="min-w-0 flex-1">
-              <div className="text-xs font-semibold uppercase tracking-wide text-[#A3ABB8]">Виртуальная карта</div>
-              {v.issued ? <MoneyBig cents={v.balance_cents} muted={frozen} /> : <div className="font-display text-[19px] font-bold leading-tight text-mt-ink">Ещё не выпущена</div>}
+        <button type="button" onClick={() => push({ name: 'vcard' })} aria-label="Открыть виртуальную карту"
+          className="relative block w-full shrink-0 snap-center text-left transition active:scale-[0.99]">
+          <CardArt holder={v.issued ? v.holder : null} last4={v.issued ? v.last4 : null} mini={!v.issued} frozen={frozen}
+            className={`!rounded-[24px] ${v.issued ? '' : 'grayscale'}`} />
+          {v.issued ? (
+            <div className="absolute right-3 top-3 rounded-full bg-black/45 px-3 py-1.5 text-white backdrop-blur-sm">
+              <div className="text-[10px] font-semibold uppercase tracking-wide text-white/70">Баланс карты</div>
+              <div className="font-display text-[17px] font-bold tabular-nums">{money(v.balance_cents)}</div>
             </div>
-            <Icon name="chevron-right" size={20} className="text-[#9AA6B8]" />
-          </div>
-          <div className="mt-4 flex-1 border-t border-line pt-4 text-sm text-muted">
-            {v.issued
-              ? <>•• {v.last4}{frozen ? ' · заморожена' : ''}. Нажми, чтобы перевести деньги, показать данные или заказать пластик</>
-              : v.available ? 'Выпусти бесплатно за минуту: нажми на карточку' : v.locked_reason ?? ''}
-          </div>
+          ) : (
+            <div className="absolute inset-0 flex flex-col items-center justify-center gap-1 rounded-[24px] bg-black/55 px-6 text-center text-white">
+              <div className="font-display text-[20px] font-bold">Виртуальная карта</div>
+              <div className="text-sm">{v.available ? 'Нажми, чтобы выпустить бесплатно за минуту' : v.locked_reason ?? ''}</div>
+            </div>
+          )}
         </button>
       </div>
       <div className="mt-3 flex justify-center gap-2">
@@ -339,6 +347,16 @@ export function CardsCarousel({ meId, card, limit }: { meId: number; card: CardT
             className={`h-2 rounded-full transition-all ${idx === i ? 'w-6 bg-mt-blue' : 'w-2 bg-[#C9D1DE]'}`} />
         ))}
       </div>
+      {limit && limit.limit_cents != null && !mainBlocked && (
+        <div className="mt-3 space-y-2 rounded-[20px] bg-card p-4 ring-1 ring-line">
+          <div className="flex items-baseline justify-between text-sm">
+            <span className="text-muted">Можно потратить сегодня</span>
+            <span className="font-semibold tabular-nums text-mt-ink">{money(limit.left_cents ?? 0)}</span>
+          </div>
+          <Progress value={limit.left_cents ?? 0} max={limit.limit_cents} />
+          <div className="text-xs tabular-nums text-muted">Лимит {money(limit.limit_cents)} в день · потрачено {money(limit.spent_cents)}</div>
+        </div>
+      )}
     </div>
   )
 }
