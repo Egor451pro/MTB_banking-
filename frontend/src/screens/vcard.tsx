@@ -328,7 +328,7 @@ export function DesignPicker({ open, onClose, childId, slot, title, kind = 'teen
   const dam = useBeaverInfo(childId, true).level.n
   const [kids, setKids] = useState(kind === 'kid')
   useEffect(() => { if (open) setKids(kind === 'kid') }, [open, kind])
-  const list = kids ? KID_DESIGNS : TEEN_DESIGNS
+  const list = [...(kids ? KID_DESIGNS : TEEN_DESIGNS)].sort((x, y) => x.lvl - y.lvl)
   const pick = (d: CardDesign) => {
     if (!isUnlocked(d, dam)) { toast(`Откроется на ${d.lvl}-м уровне плотины. Копи брёвна — бобёр достроит!`); return }
     set(d.id); onClose()
@@ -423,7 +423,7 @@ export function CardsCarousel({ meId, card, limit }: { meId: number; card: CardT
   const [pickOpen, setPickOpen] = useState(false)
   const [vDesign] = useCardDesign(meId, 'virtual')
   const [mDesign] = useCardDesign(meId, 'main')
-  if (!v && !error) return <div className="space-y-3"><div style={{ aspectRatio: 1.65 }} className="w-full animate-pulse rounded-[24px] bg-line" /><LimitStrip limit={limit} blocked={card.status === 'blocked'} /></div>
+  if (!v && !error) return <div className="space-y-3"><CardFace art={mDesign.src} card={card} label="Основная" chip={mDesign.chip} /><LimitStrip limit={limit} blocked={card.status === 'blocked'} /></div>
   if (!v) return <div className="space-y-3"><BalanceCard card={card} title="Основная карта" limit={limit} art={mDesign.src} />{error && <CardEntry meId={meId} variant="home" />}</div>
 
   const onScroll = () => {
@@ -441,6 +441,7 @@ export function CardsCarousel({ meId, card, limit }: { meId: number; card: CardT
       <div>
         <div ref={track} onScroll={onScroll}
           className="flex snap-x snap-mandatory overflow-x-auto scroll-smooth [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+          <div className="w-full shrink-0 snap-center snap-always"><CardFace art={mDesign.src} card={card} label="Основная" chip={mDesign.chip} /></div>
           <button type="button" onClick={() => push({ name: 'vcard' })} aria-label="Открыть виртуальную карту"
             className="relative block w-full shrink-0 snap-center snap-always text-left transition active:scale-[0.99]">
             <CardArt art={(v.issued ? vDesign : CLASSIC).src} chip={(v.issued ? vDesign : CLASSIC).chip} holder={v.issued ? v.holder : null} last4={v.issued ? v.last4 : null} mini={!v.issued} frozen={frozen}
@@ -457,16 +458,15 @@ export function CardsCarousel({ meId, card, limit }: { meId: number; card: CardT
               </div>
             )}
           </button>
-          <div className="w-full shrink-0 snap-center snap-always"><CardFace art={mDesign.src} card={card} label="Основная" chip={mDesign.chip} /></div>
         </div>
         <div className="mt-3 flex justify-center gap-2">
           {[0, 1].map((i) => (
-            <button key={i} type="button" onClick={() => goTo(i)} aria-label={i === 0 ? 'Виртуальная карта' : 'Основная карта'}
+            <button key={i} type="button" onClick={() => goTo(i)} aria-label={i === 0 ? 'Основная карта' : 'Виртуальная карта'}
               className={`h-2 rounded-full transition-all ${idx === i ? 'w-6 bg-mt-blue' : 'w-2 bg-[#C9D1DE]'}`} />
           ))}
         </div>
         <div className="mt-2 flex justify-center">
-          {idx === 0 && !v.issued ? (
+          {idx === 1 && !v.issued ? (
             <div className="flex items-center gap-1.5 rounded-full bg-card px-3.5 py-1.5 text-[13px] font-medium text-muted ring-1 ring-line">
               <Icon name="lock" size={14} />Дизайн можно выбрать после выпуска карты
             </div>
@@ -476,7 +476,7 @@ export function CardsCarousel({ meId, card, limit }: { meId: number; card: CardT
             </button>
           )}
         </div>
-        <DesignPicker open={pickOpen} onClose={() => setPickOpen(false)} childId={meId} slot={idx === 0 ? 'virtual' : 'main'} title={idx === 0 ? 'Дизайн виртуальной карты' : 'Дизайн основной карты'} />
+        <DesignPicker open={pickOpen} onClose={() => setPickOpen(false)} childId={meId} slot={idx === 1 ? 'virtual' : 'main'} title={idx === 1 ? 'Дизайн виртуальной карты' : 'Дизайн основной карты'} />
       </div>
       <LimitStrip limit={limit} blocked={card.status === 'blocked'} />
     </div>
