@@ -544,7 +544,7 @@ export function LessonScreen({ id }: { id: number }) {
 }
 
 // ───────── Оплата по QR через КРОК (национальный сервис мгновенных платежей) ─────────
-// Демо: настоящей камеры и подключения к КРОК нет. Платёж идёт со счёта ребёнка через ту же
+// Демо: камера настоящая (читает любой QR), но подключения к КРОК нет. Платёж идёт со счёта ребёнка через ту же
 // проверку, что и карта: лимит, запрещённые категории, запрос родителю. Это оплата в магазине,
 // поэтому она доступна и до 14 лет, в отличие от онлайн-покупок.
 interface QrMerchant { name: string; category: Category; cents: number; seed: number }
@@ -581,6 +581,44 @@ function FakeQr({ seed, size = 72 }: { seed: number; size?: number }) {
   )
 }
 
+/** Читалка QR: встроенный BarcodeDetector, если есть, иначе jsQR с CDN. Нет ни того ни другого, остаются демо-коды */
+type Detect = (v: HTMLVideoElement) => Promise<string | null>
+async function makeDetector(): Promise<Detect | null> {
+  const BD = (window as unknown as { BarcodeDetector?: new (o: { formats: string[] }) => { detect(v: HTMLVideoElement): Promise<{ rawValue: string }[]> } }).BarcodeDetector
+  if (BD) {
+    try {
+      const d = new BD({ formats: ['qr_code'] })
+      return async (v) => (await d.detect(v))[0]?.rawValue ?? null
+    } catch { /* падаем на jsQR */ }
+  }
+  try {
+    const url = 'https://cdn.jsdelivr.net/npm/jsqr@1.4.0/+esm'
+    const mod = await import(/* @vite-ignore */ url)
+    const jsQR = mod.default as (d: Uint8ClampedArray, w: number, h: number) => { data: string } | null
+    const cv = document.createElement('canvas')
+    const ctx = cv.getContext('2d', { willReadFrequently: true })
+    if (!ctx) return null
+    return async (v) => {
+      if (!v.videoWidth) return null
+      const k = Math.min(1, 480 / v.videoWidth)
+      cv.width = Math.round(v.videoWidth * k)
+      cv.height = Math.round(v.videoHeight * k)
+      ctx.drawImage(v, 0, 0, cv.width, cv.height)
+      const im = ctx.getImageData(0, 0, cv.width, cv.height)
+      return jsQR(im.data, im.width, im.height)?.data ?? null
+    }
+  } catch { return null }
+}
+
+/** Настоящий КРОК-код несёт реквизиты продавца. В демо любой QR сопоставляется с одним из магазинов */
+function merchantFor(text: string): QrMerchant {
+  let h = 0
+  for (const ch of text) h = (h * 31 + ch.charCodeAt(0)) >>> 0
+  return QR_MERCHANTS[h % QR_MERCHANTS.length]
+}
+
+type CamState = 'starting' | 'on' | 'denied' | 'unavailable'
+
 export function QrPayScreen({ meId }: { meId: number }) {
   const { back, push } = useNav()
   const { data: c, reload } = useData(() => api.getChild(meId), [meId])
@@ -588,13 +626,58 @@ export function QrPayScreen({ meId }: { meId: number }) {
   const [m, setM] = useState<QrMerchant | null>(null)
   const [res, setRes] = useState<PayResult | null>(null)
   const [paying, setPaying] = useState(false)
-  if (!c) return <><Header title="Оплата по QR" onBack={back} /><Loading /></>
+  const [cam, setCam] = useState<CamState>('starting')
+  const [camTry, setCamTry] = useState(0)
+  const videoRef = useRef<HTMLVideoElement>(null)
+  const active = step === 'scan' || step === 'scanning'
 
   const scan = (qm: QrMerchant) => {
     setM(qm)
     setStep('scanning')
     window.setTimeout(() => setStep('confirm'), 900)
   }
+  const scanRef = useRef(scan)
+  scanRef.current = scan
+
+  // Камера живёт, пока открыт сканер; на подтверждении и результате выключается
+  useEffect(() => {
+    if (!active) return
+    if (!navigator.mediaDevices?.getUserMedia) { setCam('unavailable'); return }
+    let stream: MediaStream | null = null
+    let timer = 0
+    let dead = false
+    setCam('starting')
+    navigator.mediaDevices.getUserMedia({ video: { facingMode: { ideal: 'environment' } }, audio: false })
+      .then(async (st) => {
+        if (dead) { st.getTracks().forEach((t) => t.stop()); return }
+        stream = st
+        const v = videoRef.current
+        if (!v) return
+        v.srcObject = st
+        await v.play().catch(() => undefined)
+        setCam('on')
+        const detect = await makeDetector()
+        if (!detect || dead) return
+        let busy = false
+        timer = window.setInterval(async () => {
+          if (busy || dead) return
+          busy = true
+          try {
+            const text = await detect(v)
+            if (text && !dead) { dead = true; window.clearInterval(timer); scanRef.current(merchantFor(text)) }
+          } catch { /* кадр не прочитался, пробуем следующий */ }
+          busy = false
+        }, 300)
+      })
+      .catch((e: DOMException) => setCam(e?.name === 'NotAllowedError' || e?.name === 'SecurityError' ? 'denied' : 'unavailable'))
+    return () => {
+      dead = true
+      window.clearInterval(timer)
+      stream?.getTracks().forEach((t) => t.stop())
+    }
+  }, [active, camTry])
+
+  if (!c) return <><Header title="Оплата по QR" onBack={back} /><Loading /></>
   const pay = async () => {
     if (!m || paying) return
     setPaying(true)
@@ -627,7 +710,16 @@ export function QrPayScreen({ meId }: { meId: number }) {
         {(step === 'scan' || step === 'scanning') && (
           <>
             <div className="relative mx-auto aspect-square w-full max-w-[300px] overflow-hidden rounded-[28px] bg-[#0E1424]">
-              {step === 'scanning' && m && (
+              <video ref={videoRef} playsInline muted className={`absolute inset-0 h-full w-full object-cover transition-opacity ${cam === 'on' ? 'opacity-100' : 'opacity-0'}`} />
+              {cam !== 'on' && (
+                <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 px-8 text-center text-[13px] text-white/70">
+                  <Icon name="qr" size={34} strokeWidth={1.6} />
+                  {cam === 'starting' && <span>Включаем камеру…</span>}
+                  {cam === 'denied' && <><span>Нет доступа к камере. Разреши его в настройках браузера.</span><button type="button" onClick={() => setCamTry((n) => n + 1)} className="rounded-full bg-white/15 px-4 py-1.5 font-semibold text-white">Повторить</button></>}
+                  {cam === 'unavailable' && <span>Камера недоступна. Выбери код ниже.</span>}
+                </div>
+              )}
+              {step === 'scanning' && m && cam !== 'on' && (
                 <div className="absolute inset-0 flex items-center justify-center"><FakeQr seed={m.seed} size={170} /></div>
               )}
               {/* уголки рамки и бегущая линия сканера */}
