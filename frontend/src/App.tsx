@@ -4,7 +4,7 @@ import { NavProvider, useNav } from './nav'
 import { BonusBannerHost, BottomNav, ToastHost, Loading, toast, type TabDef } from './ui'
 import { useData } from './hooks'
 import type { Me } from './types'
-import { ChildBeaver, ChildHome, ChildMe, ChildPay, ChildSavings, ChildTasks, LessonScreen, RequestScreen } from './screens/child'
+import { ChildBeaver, ChildHome, ChildMe, ChildPay, ChildSavings, ChildTasks, LessonScreen, QrPayScreen, RequestScreen } from './screens/child'
 import { LoyaltyScreen } from './screens/shared'
 import { KidPage, PackageFlow, ParentDecisions, ParentHome, ParentKids, ParentProducts, ParentTasks } from './screens/parent'
 import { MobyShell } from './screens/moby'
@@ -69,6 +69,7 @@ function ChildShell({ me }: { me: Me }) {
   else if (top?.name === 'lesson') body = <LessonScreen key={top.params!.id} id={top.params!.id} />
   else if (top?.name === 'loyalty') body = <LoyaltyScreen onBack={back} />
   else if (top?.name === 'pay') body = <ChildPay meId={me.id} />
+  else if (top?.name === 'qr') body = <QrPayScreen meId={me.id} />
   else if (tab === 'savings') body = <ChildSavings meId={me.id} />
   else if (tab === 'pet') body = <ChildBeaver meId={me.id} ageGroup={me.age_group} />
   else if (tab === 'tasks') body = <ChildTasks />

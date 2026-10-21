@@ -32,3 +32,8 @@
 .reveal-btn { animation: speech-in .25s ease-out both, reveal-pulse 1.5s .3s ease-out infinite; }
 @keyframes chip-in { from { opacity: 0; transform: translateY(-8px) } to { opacity: 1; transform: none } }
 .chip-in { animation: chip-in .4s 1.4s ease-out both; }
+
+/* Сканер QR (оплата через КРОК) */
+@keyframes qr-scan { 0%, 100% { top: 18% } 50% { top: 80% } }
+.qr-scanline { animation: qr-scan 2.2s ease-in-out infinite; }
+@media (prefers-reduced-motion: reduce) { .qr-scanline { animation: none; top: 50% } }

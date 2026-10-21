@@ -22,6 +22,7 @@ export function ChildHome({ meId }: { meId: number }) {
   const waiting = reqs.data?.items.filter((r) => r.status === 'pending').length ?? 0
 
   const actions: { icon: IconName; label: string; go: () => void }[] = [
+    { icon: 'qr', label: 'Оплатить', go: () => push({ name: 'qr' }) },
     { icon: 'chat', label: 'Попросить', go: () => push({ name: 'request' }) },
     { icon: 'target', label: 'Копилка', go: () => setTab('savings') },
     { icon: 'tasks', label: 'Задания', go: () => setTab('tasks') },
@@ -34,7 +35,7 @@ export function ChildHome({ meId }: { meId: number }) {
       <div className="-mt-12 space-y-5 px-4 pb-6">
         <BalanceCard card={c.card} title="Мой баланс" limit={c.limits_today} />
 
-        <div className="grid grid-cols-3 gap-2">
+        <div className="grid grid-cols-4 gap-2">
           {actions.map((a) => (
             <button key={a.label} onClick={a.go} className="flex flex-col items-center gap-1.5 rounded-[20px] bg-card py-3 transition active:scale-[0.97]">
               <IconTile name={a.icon} />
@@ -536,6 +537,157 @@ export function LessonScreen({ id }: { id: number }) {
             </div>
             <Btn onClick={back}>Готово</Btn>
           </>
+        )}
+      </div>
+    </>
+  )
+}
+
+// ───────── Оплата по QR через КРОК (национальный сервис мгновенных платежей) ─────────
+// Демо: настоящей камеры и подключения к КРОК нет. Платёж идёт со счёта ребёнка через ту же
+// проверку, что и карта: лимит, запрещённые категории, запрос родителю. Это оплата в магазине,
+// поэтому она доступна и до 14 лет, в отличие от онлайн-покупок.
+interface QrMerchant { name: string; category: Category; cents: number; seed: number }
+const QR_MERCHANTS: QrMerchant[] = [
+  { name: 'Столовая школы', category: 'food', cents: 300, seed: 3 },
+  { name: 'Кофейня', category: 'food', cents: 450, seed: 7 },
+  { name: 'Книжный магазин', category: 'education', cents: 900, seed: 11 },
+  { name: 'Кинотеатр', category: 'entertainment', cents: 1200, seed: 5 },
+  { name: 'Игровой клуб', category: 'games', cents: 1500, seed: 13 },
+]
+
+/** Рисует похожий на QR узор: для демо-кодов магазинов, а не настоящий код */
+function FakeQr({ seed, size = 72 }: { seed: number; size?: number }) {
+  const n = 21
+  let x = seed * 9301 + 49297
+  const rnd = () => { x = (x * 9301 + 49297) % 233280; return x / 233280 }
+  const cells: [number, number][] = []
+  for (let r = 0; r < n; r++) for (let c = 0; c < n; c++) {
+    const inFinder = (r < 8 && c < 8) || (r < 8 && c > n - 9) || (r > n - 9 && c < 8)
+    if (!inFinder && rnd() > 0.52) cells.push([r, c])
+  }
+  const finder = (r: number, c: number) => (
+    <g key={`${r}-${c}`}>
+      <rect x={c} y={r} width="7" height="7" fill="#141416" />
+      <rect x={c + 1} y={r + 1} width="5" height="5" fill="#fff" />
+      <rect x={c + 2} y={r + 2} width="3" height="3" fill="#141416" />
+    </g>
+  )
+  return (
+    <svg width={size} height={size} viewBox={`-1 -1 ${n + 2} ${n + 2}`} className="rounded-md bg-white" aria-hidden>
+      {cells.map(([r, c]) => <rect key={`${r}:${c}`} x={c} y={r} width="1" height="1" fill="#141416" />)}
+      {finder(0, 0)}{finder(0, n - 7)}{finder(n - 7, 0)}
+    </svg>
+  )
+}
+
+export function QrPayScreen({ meId }: { meId: number }) {
+  const { back, push } = useNav()
+  const { data: c, reload } = useData(() => api.getChild(meId), [meId])
+  const [step, setStep] = useState<'scan' | 'scanning' | 'confirm' | 'done'>('scan')
+  const [m, setM] = useState<QrMerchant | null>(null)
+  const [res, setRes] = useState<PayResult | null>(null)
+  const [paying, setPaying] = useState(false)
+  if (!c) return <><Header title="Оплата по QR" onBack={back} /><Loading /></>
+
+  const scan = (qm: QrMerchant) => {
+    setM(qm)
+    setStep('scanning')
+    window.setTimeout(() => setStep('confirm'), 900)
+  }
+  const pay = async () => {
+    if (!m || paying) return
+    setPaying(true)
+    try {
+      // В истории операций платёж подписан «· КРОК», так его видит и родитель
+      const r = await api.simulatePayment({ card_id: c.card.id, amount_cents: m.cents, category: m.category, merchant: `${m.name} · КРОК`, is_online: false })
+      setRes(r)
+      setStep('done')
+      await reload()
+    } catch (e) {
+      toast((e as Error).message)
+    } finally {
+      setPaying(false)
+    }
+  }
+  const askFor = (): { type: ReqType; amount?: number; category?: Category } | null => {
+    if (!m || !res || res.status !== 'declined') return null
+    if (res.decline_reason === 'limit_exceeded') return { type: 'limit_increase', amount: m.cents }
+    if (res.decline_reason === 'category_blocked') return { type: 'category_unlock', category: m.category }
+    if (res.decline_reason === 'insufficient_funds') return { type: 'money', amount: m.cents }
+    return null
+  }
+  const ask = askFor()
+  const status = res?.status
+
+  return (
+    <>
+      <Header title="Оплата по QR" subtitle="Через КРОК, со своего счёта, без карты" onBack={back} />
+      <div className="space-y-4 p-4">
+        {(step === 'scan' || step === 'scanning') && (
+          <>
+            <div className="relative mx-auto aspect-square w-full max-w-[300px] overflow-hidden rounded-[28px] bg-[#0E1424]">
+              {step === 'scanning' && m && (
+                <div className="absolute inset-0 flex items-center justify-center"><FakeQr seed={m.seed} size={170} /></div>
+              )}
+              {/* уголки рамки и бегущая линия сканера */}
+              {[['left-6 top-6', 'border-l-4 border-t-4 rounded-tl-xl'], ['right-6 top-6', 'border-r-4 border-t-4 rounded-tr-xl'], ['left-6 bottom-6', 'border-l-4 border-b-4 rounded-bl-xl'], ['right-6 bottom-6', 'border-r-4 border-b-4 rounded-br-xl']].map(([pos, b]) => (
+                <span key={pos} className={`absolute ${pos} h-10 w-10 border-white ${b}`} />
+              ))}
+              <span className="qr-scanline absolute inset-x-8 h-0.5 rounded-full bg-[#4C86F0] shadow-[0_0_12px_2px_rgba(76,134,240,0.8)]" />
+              <div className="absolute inset-x-0 bottom-3 text-center text-[13px] text-white/70">
+                {step === 'scanning' ? 'Считываем код…' : 'Наведи камеру на QR-код продавца'}
+              </div>
+            </div>
+            <Section title="Демо: QR-коды на кассе">
+              <div className="grid grid-cols-2 gap-2">
+                {QR_MERCHANTS.map((qm) => (
+                  <button key={qm.name} type="button" disabled={step === 'scanning'} onClick={() => scan(qm)}
+                    className="flex items-center gap-3 rounded-[20px] bg-card p-3 text-left transition active:scale-[0.98] disabled:opacity-60">
+                    <FakeQr seed={qm.seed} size={44} />
+                    <div className="min-w-0">
+                      <div className="truncate text-[14px] font-semibold text-mt-ink">{qm.name}</div>
+                      <div className="text-[13px] tabular-nums text-muted">{money(qm.cents)}</div>
+                    </div>
+                  </button>
+                ))}
+              </div>
+            </Section>
+          </>
+        )}
+
+        {step === 'confirm' && m && (
+          <Card className="space-y-4 text-center">
+            <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-tint text-[#2F6FE4]"><Icon name={CATEGORY_ICON[m.category]} size={28} /></div>
+            <div>
+              <div className="text-[15px] text-muted">{m.name}</div>
+              <div className="font-display text-[36px] font-bold tabular-nums text-mt-ink">{money(m.cents)}</div>
+              <div className="text-[13px] text-muted">{CATEGORY_LABEL[m.category]} · спишется со счёта ребёнка</div>
+            </div>
+            <div className="grid grid-cols-2 gap-2 rounded-2xl bg-elevated p-3 text-left text-[13px]">
+              <div><div className="text-muted">На счёте</div><div className="font-semibold tabular-nums text-mt-ink">{money(c.card.balance_cents)}</div></div>
+              <div><div className="text-muted">Можно сегодня</div><div className="font-semibold tabular-nums text-mt-ink">{c.limits_today.left_cents != null ? money(c.limits_today.left_cents) : 'без лимита'}</div></div>
+            </div>
+            <Btn onClick={pay} disabled={paying}>{paying ? 'Оплачиваем…' : 'Оплатить через КРОК'}</Btn>
+            <Btn tone="secondary" onClick={() => setStep('scan')}>Отмена</Btn>
+          </Card>
+        )}
+
+        {step === 'done' && m && res && (
+          <Card className="flex flex-col items-center text-center">
+            <div className={`anim-pop flex h-16 w-16 items-center justify-center rounded-full ${status === 'approved' ? 'bg-[#2F6FE4] text-white' : status === 'pending' ? 'bg-tint text-mt-ink' : 'bg-mt-red text-white'}`}>
+              <Icon name={status === 'approved' ? 'check' : status === 'pending' ? 'clock' : 'x'} size={32} strokeWidth={2.4} />
+            </div>
+            <div className="mt-4 text-[22px] font-bold tracking-tight text-mt-ink">
+              {status === 'approved' ? 'Оплачено' : status === 'pending' ? 'Ждём родителя' : 'Оплата отклонена'}
+            </div>
+            <div className="mt-1 text-[15px] text-muted">{m.name} · <span className="tabular-nums">{money(m.cents)}</span></div>
+            <div className="mt-4 w-full rounded-xl bg-elevated px-4 py-3 text-sm text-mt-ink">{res.message}</div>
+            <div className="mt-5 w-full space-y-2">
+              {ask && <Btn icon="chat" onClick={() => push({ name: 'request', params: ask })}>Попросить у родителя</Btn>}
+              <Btn tone="secondary" onClick={back}>Готово</Btn>
+            </div>
+          </Card>
         )}
       </div>
     </>
