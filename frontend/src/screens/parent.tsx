@@ -10,7 +10,7 @@ import {
 } from '../ui'
 import type { Category, ConsentType, LimitItem } from '../types'
 import { GoalCard, REQ_ICON, TaskHead, TxList, TxRow, requestText } from './shared'
-import { beaverInfo, damSrc, logWord } from './beaver'
+import { damSrc, logWord, useBeaverInfo } from './beaver'
 
 // Какого ребёнка открыть во вкладке «Дети» (выбирают на главной или после оформления карты)
 let selectedKid: number | null = null
@@ -287,6 +287,7 @@ export function ChildManage({ id, switcher }: { id: number; switcher?: ReactNode
   const perms = useData(() => api.getPermissions(id), [id], 4000)
   const [topup, setTopup] = useState(false)
   const [amount, setAmount] = useState('')
+  const b = useBeaverInfo(id)
   if (!c) return <><Header title="Дети" right={switcher} /><Loading /></>
   const blocked = c.card.status === 'blocked'
   const open = (page: KidPageId) => push({ name: 'kid', params: { id, page } })
@@ -297,7 +298,6 @@ export function ChildManage({ id, switcher }: { id: number; switcher?: ReactNode
   const limitText = !lim.data ? '' : `${daily ? `До ${money(daily.amount_cents)} в день` : 'Без дневного лимита'}${banned ? `, запрещено категорий: ${banned}` : ''}`
   const permOn = perms.data?.items.filter((p) => p.enabled).length ?? 0
   const activeGoals = goals.data?.items.filter((g) => g.status === 'active').length ?? 0
-  const b = beaverInfo(id)
 
   return (
     <>
@@ -579,7 +579,7 @@ function LessonsProgress({ childId }: { childId: number }) {
 
 // Уровень ребёнка = уровень плотины бобра (брёвна за накопления, задания и уроки)
 function BeaverCard({ childId }: { childId: number }) {
-  const b = beaverInfo(childId)
+  const b = useBeaverInfo(childId)
   const left = b.next ? Math.max(0, b.next.need - b.built) : 0
   return (
     <Card>

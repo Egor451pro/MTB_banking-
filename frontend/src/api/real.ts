@@ -60,6 +60,8 @@ export function realApi(base: string): Api {
     getLevel: (id) => get(`/children/${id}/level`),
     acceptSuggestion: (id) => post(`/children/${id}/level/suggestion/accept`),
     demoReset: () => post('/demo/reset'),
+    getBeaver: (id) => get(`/children/${id}/beaver`),
+    putBeaver: (id, data, updated_at) => put(`/children/${id}/beaver`, { data, updated_at }),
 
     listPendingPurchases: () => get('/purchases/pending'),
     listPendingBonuses: () => get('/bonuses/pending'),

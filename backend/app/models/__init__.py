@@ -24,6 +24,8 @@ from .models import (
     GoalStatus
 )
 
+from .beaver import BeaverState
+
 __all__ = [
     "Family",
     "User",
@@ -47,5 +49,6 @@ __all__ = [
     "RequestType",
     "RequestStatus",
     "TaskStatus",
-    "GoalStatus"
+    "GoalStatus",
+    "BeaverState"
 ]

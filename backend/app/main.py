@@ -17,6 +17,7 @@ from app.routers import (
     family_router,
     lesson_router,
     loyalty_router,
+    beaver_router,
     goal_router,
     limit_router,
     payment_router,
@@ -75,6 +76,7 @@ app.include_router(transaction_router, tags=["Transactions"])
 app.include_router(demo_router, tags=["Demo"])
 app.include_router(lesson_router, tags=["Lessons"])
 app.include_router(loyalty_router, tags=["Loyalty"])
+app.include_router(beaver_router, tags=["Beaver"])
 
 
 @app.exception_handler(HTTPException)

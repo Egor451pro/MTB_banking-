@@ -9,6 +9,8 @@ import { mockApi } from './mock'
 // Текущий пользователь после демо-входа. Клиент шлёт его как X-User-Id.
 export const session = { userId: 0 }
 
+export type BeaverSave = { data: Record<string, unknown> | null; updated_at: number }
+
 export type LoginResult = { id: number; role: 'parent' | 'child'; name: string }
 
 // Один интерфейс для настоящего API и для mock: экраны не знают, что за ним стоит.
@@ -41,6 +43,10 @@ export interface Api {
   getLevel(childId: number): Promise<LevelInfo>
   acceptSuggestion(childId: number): Promise<{ applied: boolean }>
   demoReset(): Promise<{ status: string }>
+
+  // Прогресс бобра хранится на сервере, чтобы был одним и тем же на всех устройствах
+  getBeaver(childId: number): Promise<BeaverSave>
+  putBeaver(childId: number, data: Record<string, unknown>, updatedAt: number): Promise<BeaverSave>
 
   // Подтверждение покупок родителем
   listPendingPurchases(): Promise<{ items: PendingPurchase[] }>

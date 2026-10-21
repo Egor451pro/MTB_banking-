@@ -166,6 +166,8 @@ class MockError extends Error {
 
 export function mockApi(): Api {
   let db = seed()
+  // Бобёр: то же правило, что на сервере: побеждает более новое состояние
+  let beavers: Record<number, { data: Record<string, unknown>; updated_at: number }> = {}
   function decideBonus(id: number, approve: boolean) {
     const m = requireParent()
     const b = db.bonuses.find((x) => x.id === id)
@@ -584,7 +586,18 @@ export function mockApi(): Api {
       return delay({ applied: true })
     },
 
-    async demoReset() { db = seed(); return delay({ status: 'ok' }) },
+    async demoReset() { db = seed(); beavers = {}; return delay({ status: 'ok' }) },
+
+    async getBeaver(childId) {
+      const b = beavers[childId]
+      return delay(b ? { data: b.data, updated_at: b.updated_at } : { data: null, updated_at: 0 })
+    },
+    async putBeaver(childId, data, updatedAt) {
+      const cur = beavers[childId]
+      if (!cur || cur.updated_at <= updatedAt) beavers[childId] = { data, updated_at: updatedAt }
+      const b = beavers[childId]
+      return delay({ data: b.data, updated_at: b.updated_at })
+    },
 
     // ───────── Подтверждение покупок ─────────
     async listPendingPurchases() {

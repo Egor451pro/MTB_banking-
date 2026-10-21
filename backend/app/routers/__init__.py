@@ -9,6 +9,7 @@ from .transaction import router as transaction_router
 from .demo import router as demo_router
 from .lesson import router as lesson_router
 from .loyalty import router as loyalty_router
+from .beaver import router as beaver_router
 
 __all__ = [
     "user_router",
@@ -22,4 +23,5 @@ __all__ = [
     "demo_router",
     "lesson_router",
     "loyalty_router",
+    "beaver_router",
 ]

@@ -11,7 +11,7 @@ import {
 import type { Category, DeclineReason, LessonResult, PayResult, PermissionKey, ReqType } from '../types'
 import { GoalCard, REQ_ICON, TaskHead, TxList, requestText } from './shared'
 import { MIN_GOAL_CENTS } from '../beaverState'
-import { BeaverPanel, LOGS_PER_LESSON, beaverInfo, damSrc, logWord } from './beaver'
+import { BeaverPanel, LOGS_PER_LESSON, damSrc, logWord, useBeaverInfo } from './beaver'
 
 // ───────── Главная ребёнка ─────────
 export function ChildHome({ meId }: { meId: number }) {
@@ -19,6 +19,7 @@ export function ChildHome({ meId }: { meId: number }) {
   const { data: c } = useData(() => api.getChild(meId), [meId], 2000)
   const reqs = useData(() => api.listRequests(), [], 2000)
   const al = useData(() => api.getAllowance(meId), [meId])
+  const beaver = useBeaverInfo(meId, true)
   if (!c) return <><Header title="Привет!" /><Loading /></>
   const waiting = reqs.data?.items.filter((r) => r.status === 'pending').length ?? 0
 
@@ -28,7 +29,6 @@ export function ChildHome({ meId }: { meId: number }) {
     { icon: 'target', label: 'Копилка', go: () => setTab('savings') },
     { icon: 'tasks', label: 'Задания', go: () => setTab('tasks') },
   ]
-  const beaver = beaverInfo(meId)
 
   return (
     <>
@@ -441,8 +441,8 @@ export function ChildMe({ meId }: { meId: number }) {
   const loyalty = useData(() => api.getLoyalty(), [], 3000)
   const perms = useData(() => api.getPermissions(meId), [meId], 3000)
   const reqs = useData(() => api.listRequests(), [], 3000)
+  const beaver = useBeaverInfo(meId, true)
   if (!c) return <><Header title="Я" /><Loading /></>
-  const beaver = beaverInfo(meId)
   const waiting = reqs.data?.items.filter((r) => r.status === 'pending').length ?? 0
   return (
     <>

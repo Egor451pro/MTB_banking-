@@ -4,20 +4,20 @@ import { plural } from '../format'
 import { useData } from '../hooks'
 import { Btn, Card, Loading, Progress, Row, Sheet, toast } from '../ui'
 import {
-  CHANGE_EVENT, DAM_LEVELS, DAY, DECAY_PER_DAY, GRACE_DAYS, HEAL_PER_LOG, MIN_GOAL_CENTS, PLACE_PER_DAY,
-  collapseAt, dayOf, healthAt, levelByN, levelFor, loadState, noteEarned, now, saveState, tickState,
+  CHANGE_EVENT, DAM_LEVELS, DAY, DECAY_PER_DAY, EARN_PER_DAY, GRACE_DAYS, HEAL_PER_LOG, MIN_GOAL_CENTS,
+  collapseAt, dayOf, healthAt, levelByN, levelFor, loadState, noteEarned, now, saveState, tickState, useBeaverSync,
   type BeaverState,
 } from '../beaverState'
 import '../beaver.css'
 
-export { beaverInfo, DAM_LEVELS, levelByN, levelFor } from '../beaverState'
+export { beaverInfo, useBeaverInfo, DAM_LEVELS, levelByN, levelFor } from '../beaverState'
 
 // Вкладка «Бобёр»: питомец строит плотину из брёвен.
 // Брёвна считаются из реальных действий: накопления в целях от 20 BYN, подтверждённые задания,
 // достигнутые цели, пройденные уроки. Купить их нельзя.
 //
 // Правила, которые держат интерес:
-//  • склад: заработанные брёвна не пропадают, но бобёр укладывает не больше PLACE_PER_DAY в день;
+//  • склад: за день на склад попадает не больше EARN_PER_DAY заработанных брёвен, остальные ждут завтра;
 //  • новый уровень достраивается по настоящему таймеру, потом плотину открывают кнопкой;
 //  • прочность: если не заходить и не копить, плотина слабеет и в конце концов уровень падает;
 //    каждое уложенное бревно её чинит.
@@ -87,8 +87,14 @@ function LogShape() {
   )
 }
 
-/** Блок с бобром и плотиной. Стоит наверху вкладки «Бобёр». */
-export function BeaverPanel({ meId, ageGroup }: { meId: number; ageGroup: string }) {
+/** Блок с бобром и плотиной. Сначала подтягиваем сохранённого бобра с сервера, потом рисуем сцену. */
+export function BeaverPanel(props: { meId: number; ageGroup: string }) {
+  const synced = useBeaverSync(props.meId, true)
+  if (!synced) return <Loading />
+  return <BeaverScene {...props} />
+}
+
+function BeaverScene({ meId, ageGroup }: { meId: number; ageGroup: string }) {
   const teen = ageGroup === '14-17'
   const sprite = teen ? '/beaver/teen.png' : '/beaver/kid.png'
   const spriteCheer = teen ? '/beaver/teen.png' : '/beaver/kid-wave.png'
@@ -139,7 +145,8 @@ export function BeaverPanel({ meId, ageGroup }: { meId: number; ageGroup: string
   }
 
   useEffect(() => {
-    saveState(meId, sRef.current)
+    // сохраняем только если время что-то изменило (размыв, конец стройки), иначе не затираем более свежее состояние с сервера
+    if (JSON.stringify(sRef.current) !== JSON.stringify(loadState(meId))) saveState(meId, sRef.current)
     if (init.current && init.current.dropped > 0) toast(`Плотину размыло до уровня ${sRef.current.level}`)
     const iv = window.setInterval(advance, 1000)
     // демо-панель вне телефона меняет состояние: перечитываем
@@ -167,6 +174,7 @@ export function BeaverPanel({ meId, ageGroup }: { meId: number; ageGroup: string
     if (earnedBase === null) return
     const n = noteEarned(sRef.current, earnedBase)
     if (n !== sRef.current) commit(n)
+    advance()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [earnedBase])
 
@@ -226,13 +234,13 @@ export function BeaverPanel({ meId, ageGroup }: { meId: number; ageGroup: string
   const cProg = constructing ? Math.min(1, Math.max(0, (t - s.buildStart) / Math.max(1, s.buildEnd - s.buildStart))) : 0
   const pct = Math.round(cProg * 100)
   const health = healthAt(s, t)
-  const placedToday = s.day === dayOf(t) ? s.placed : 0
-  const room = Math.max(0, PLACE_PER_DAY - placedToday)
-  const balance = Math.max(0, earnedBase + s.gift - s.built - s.lost)
+  const earnedToday = s.day === dayOf(t) ? s.earnedToday : 0
+  const waiting = Math.max(0, earnedBase - s.credited)
+  const balance = Math.max(0, s.credited + s.gift - s.built - s.lost)
   const next = DAM_LEVELS.find((l) => l.n === levelFor(s.built).n + 1)
   // перед новым уровнем кладём ровно столько, сколько до него осталось; на последнем уровне брёвна идут на ремонт
   const toNext = next ? next.need - s.built : Math.ceil((100 - health) / HEAL_PER_LOG)
-  const spend = Math.max(0, Math.min(room, balance, toNext))
+  const spend = Math.max(0, Math.min(balance, toNext))
   const busy = throwing || hidden || revealing
   const shownLevel = levelByN(s.level)
   const daysLeft = Math.max(0, Math.ceil((collapseAt(s) - t) / DAY))
@@ -253,8 +261,6 @@ export function BeaverPanel({ meId, ageGroup }: { meId: number; ageGroup: string
           commit({
             ...cur,
             built: cur.built + 1,
-            day: dayOf(tt),
-            placed: (cur.day === dayOf(tt) ? cur.placed : 0) + 1,
             hp: Math.min(100, healthAt(cur, tt) + HEAL_PER_LOG),
             lastActive: tt,
           })
@@ -281,7 +287,6 @@ export function BeaverPanel({ meId, ageGroup }: { meId: number; ageGroup: string
   else if (throwing) btnText = 'Бобёр работает'
   else if (!next && health >= 100) btnText = 'Плотина в порядке'
   else if (balance <= 0) btnText = 'Нет брёвен'
-  else if (room <= 0) btnText = 'На сегодня хватит, завтра ещё'
 
   const healthWord = health >= 70 ? 'Крепкая' : health >= 40 ? 'Есть трещины' : 'Течёт'
 
@@ -374,8 +379,8 @@ export function BeaverPanel({ meId, ageGroup }: { meId: number; ageGroup: string
           </div>
           <div className="mt-3"><Progress value={next ? s.built : 1} max={next ? next.need : 1} tone="brand" /></div>
           <div className="mt-2 text-[13px] text-muted">
-            Сегодня уложено {placedToday} из {PLACE_PER_DAY}
-            {next ? `. Дальше: ${next.title.toLowerCase()}` : ''}
+            Сегодня получено {earnedToday} из {EARN_PER_DAY}
+            {waiting > 0 ? `. Ещё ${waiting} ${logWord(waiting)} получишь завтра` : next ? `. Дальше: ${next.title.toLowerCase()}` : ''}
           </div>
         </Card>
 
@@ -409,7 +414,7 @@ export function BeaverPanel({ meId, ageGroup }: { meId: number; ageGroup: string
           <Row icon="book" iconTone="blue" title="Пройти урок" sub={`${LOGS_PER_LESSON} ${logWord(LOGS_PER_LESSON)}`} />
         </Card>
         <p className="mt-3 text-[13px] text-muted">
-          Брёвна нельзя купить, только заработать. Они ждут на складе, а бобёр укладывает не больше {PLACE_PER_DAY} в день.
+          Брёвна нельзя купить, только заработать. Больше {EARN_PER_DAY} брёвен в день на склад не попадает, остальные ждут своей очереди. Класть их в плотину можно сколько угодно.
           Если {GRACE_DAYS} дня не заходить и не копить, плотина начнёт слабеть на {DECAY_PER_DAY}% в день. Когда прочность кончится, уровень упадёт на один, а часть брёвен унесёт река.
           Уложенные брёвна чинят плотину.
         </p>
