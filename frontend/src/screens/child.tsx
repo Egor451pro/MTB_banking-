@@ -612,6 +612,8 @@ async function makeDetector(): Promise<Detect | null> {
 
 /** Настоящий КРОК-код несёт реквизиты продавца. В демо любой QR сопоставляется с одним из магазинов */
 function merchantFor(text: string): QrMerchant {
+  const demo = /^KROK-DEMO:(\d+)$/.exec(text)
+  if (demo && QR_MERCHANTS[+demo[1]]) return QR_MERCHANTS[+demo[1]]
   let h = 0
   for (const ch of text) h = (h * 31 + ch.charCodeAt(0)) >>> 0
   return QR_MERCHANTS[h % QR_MERCHANTS.length]
