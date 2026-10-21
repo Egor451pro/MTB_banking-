@@ -1,11 +1,11 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { api } from '../api'
 import { dateTime, money, toCents } from '../format'
 import { useData } from '../hooks'
 import { Icon } from '../icons'
 import { useNav } from '../nav'
-import { Btn, ConfirmBtn, Card, Field, Header, Loading, Note, Row, Sheet, toast } from '../ui'
-import type { VirtualCard } from '../types'
+import { BalanceCard, Btn, ConfirmBtn, Card, Field, Header, Loading, MoneyBig, Note, Row, Sheet, toast } from '../ui'
+import type { Card as CardT, VirtualCard } from '../types'
 import '../beaver.css'
 
 // Виртуальная карта подростка (14–17 лет): выпуск в приложении, данные карты, заморозка,
@@ -283,6 +283,63 @@ export function CardEntry({ meId, variant }: { meId: number; variant: 'home' | '
       </div>
       <Icon name="chevron-right" size={20} className="text-[#9AA6B8]" />
     </button>
+  )
+}
+
+
+// ───────── Карусель карт на главной подростка: основная ⇄ виртуальная свайпом ─────────
+type LimitToday = { limit_cents: number | null; spent_cents: number; left_cents: number | null }
+
+export function CardsCarousel({ meId, card, limit }: { meId: number; card: CardT; limit?: LimitToday }) {
+  const { push } = useNav()
+  const { data: v, error } = useData(() => api.getVirtualCard(meId), [meId], 4000)
+  const track = useRef<HTMLDivElement>(null)
+  const [idx, setIdx] = useState(0)
+  const main = <BalanceCard card={card} title="Основная карта" limit={limit} />
+  if (!v) return <div className="space-y-3">{main}{error && <CardEntry meId={meId} variant="home" />}</div>
+
+  const onScroll = () => {
+    const el = track.current
+    if (el) setIdx(Math.round(el.scrollLeft / Math.max(1, el.scrollWidth - el.clientWidth)))
+  }
+  const goTo = (i: number) => {
+    const el = track.current
+    if (el) el.scrollTo({ left: i * (el.scrollWidth - el.clientWidth), behavior: 'smooth' })
+  }
+  const frozen = v.status === 'frozen'
+
+  return (
+    <div>
+      <div ref={track} onScroll={onScroll}
+        className="-mx-4 flex gap-3 snap-x snap-mandatory overflow-x-auto scroll-smooth px-4 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+        <div className="w-full shrink-0 snap-center">{main}</div>
+        <button type="button" onClick={() => push({ name: 'vcard' })}
+          className="flex w-full shrink-0 snap-center flex-col rounded-[24px] bg-card p-5 text-left shadow-sm ring-1 ring-line transition active:scale-[0.99]"
+          aria-label="Открыть виртуальную карту">
+          <div className="flex items-center gap-4">
+            {v.issued
+              ? <div className="w-[72px] shrink-0"><CardArt mini frozen={frozen} className="!rounded-[10px] !shadow-none" /></div>
+              : <div className="w-[72px] shrink-0"><CardArt mini frozen className="!rounded-[10px] !shadow-none" /></div>}
+            <div className="min-w-0 flex-1">
+              <div className="text-xs font-semibold uppercase tracking-wide text-[#A3ABB8]">Виртуальная карта</div>
+              {v.issued ? <MoneyBig cents={v.balance_cents} muted={frozen} /> : <div className="font-display text-[19px] font-bold leading-tight text-mt-ink">Ещё не выпущена</div>}
+            </div>
+            <Icon name="chevron-right" size={20} className="text-[#9AA6B8]" />
+          </div>
+          <div className="mt-4 flex-1 border-t border-line pt-4 text-sm text-muted">
+            {v.issued
+              ? <>•• {v.last4}{frozen ? ' · заморожена' : ''}. Нажми, чтобы перевести деньги, показать данные или заказать пластик</>
+              : v.available ? 'Выпусти бесплатно за минуту: нажми на карточку' : v.locked_reason ?? ''}
+          </div>
+        </button>
+      </div>
+      <div className="mt-3 flex justify-center gap-2">
+        {[0, 1].map((i) => (
+          <button key={i} type="button" onClick={() => goTo(i)} aria-label={i === 0 ? 'Основная карта' : 'Виртуальная карта'}
+            className={`h-2 rounded-full transition-all ${idx === i ? 'w-6 bg-mt-blue' : 'w-2 bg-[#C9D1DE]'}`} />
+        ))}
+      </div>
+    </div>
   )
 }
 

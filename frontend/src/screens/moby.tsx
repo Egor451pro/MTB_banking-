@@ -80,7 +80,7 @@ function MobyHome({ name, onFamily }: { name: string; onFamily: (from: HTMLEleme
 
         <div className="pt-2 text-[24px] font-bold text-mt-ink">Счета</div>
         <div className="flex items-center gap-4 rounded-[22px] bg-card px-5 py-4">
-          <div className="h-12 w-[74px] rounded-xl bg-gradient-to-br from-[#1B289E] via-[#2334C8] to-[#5A3FD0]" />
+          <img src="/card/main.jpg" alt="Карта МТБанка" className="h-12 w-[74px] rounded-xl object-cover" />
           <div>
             <div className="text-[12px] font-semibold uppercase tracking-wide text-muted">Текущий счёт</div>
             <div className="text-[18px] font-bold tabular-nums text-mt-ink">{money(124350)}</div>

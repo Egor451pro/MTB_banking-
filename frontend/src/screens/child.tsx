@@ -11,7 +11,7 @@ import {
 import type { Category, DeclineReason, LessonResult, PayResult, PermissionKey, ReqType } from '../types'
 import { GoalCard, REQ_ICON, TaskHead, TxList, requestText } from './shared'
 import { MIN_GOAL_CENTS } from '../beaverState'
-import { CardEntry } from './vcard'
+import { CardEntry, CardsCarousel } from './vcard'
 import { BeaverPanel, LOGS_PER_LESSON, damSrc, logWord, useBeaverInfo } from './beaver'
 
 // ───────── Главная ребёнка ─────────
@@ -33,9 +33,11 @@ export function ChildHome({ meId }: { meId: number }) {
 
   return (
     <>
-      <Header title={`Привет, ${c.name}!`} subtitle="Детская карта" right={<Avatar name={c.name} light size={38} />} tall />
+      <Header title={`Привет, ${c.name}!`} subtitle={c.age_group === '14-17' ? 'Листай карты свайпом' : 'Детская карта'} right={<Avatar name={c.name} light size={38} />} tall />
       <div className="-mt-12 space-y-5 px-4 pb-6">
-        <BalanceCard card={c.card} title="Мой баланс" limit={c.limits_today} />
+        {c.age_group === '14-17'
+          ? <CardsCarousel meId={meId} card={c.card} limit={c.limits_today} />
+          : <BalanceCard card={c.card} title="Мой баланс" limit={c.limits_today} />}
 
         <div className="grid grid-cols-4 gap-2">
           {actions.map((a) => (
@@ -59,8 +61,6 @@ export function ChildHome({ meId }: { meId: number }) {
           </div>
           <Icon name="chevron-right" size={20} className="text-[#9AA6B8]" />
         </button>
-
-        {c.age_group === '14-17' && <CardEntry meId={meId} variant="home" />}
 
         <Section title="Последние операции">
           <TxList childId={meId} limit={5} poll={2000} />

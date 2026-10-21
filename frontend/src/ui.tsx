@@ -391,12 +391,12 @@ export function MoneyBig({ cents, muted }: { cents: number; muted?: boolean }) {
   )
 }
 
-// Миниатюра карты, как у счёта в Moby
+// Миниатюра основной карты МТБанка, как у счёта в Moby
 export function MiniCard({ last4, blocked }: { last4: string; blocked?: boolean }) {
   return (
-    <div className={`relative h-[46px] w-[72px] shrink-0 overflow-hidden rounded-[10px] ${blocked ? 'bg-gradient-to-br from-[#9AA3B2] to-[#5E6878]' : 'bg-gradient-to-br from-[#121C6E] via-[#2334C8] to-[#5B8CF0]'}`}>
-      <div className="absolute -right-4 -top-5 h-12 w-12 rounded-full bg-white/25 blur-md" />
-      <div className="absolute bottom-1 right-1.5 text-[9px] font-semibold tracking-wider text-white/90">•• {last4}</div>
+    <div className="relative h-[46px] w-[72px] shrink-0 overflow-hidden rounded-[10px] bg-[#0B0B12]">
+      <img src="/card/main.jpg" alt="" draggable={false} className={`h-full w-full object-cover ${blocked ? 'opacity-60 grayscale' : ''}`} />
+      <div className="absolute bottom-1 left-1.5 text-[9px] font-semibold tracking-wider text-white/90">•• {last4}</div>
     </div>
   )
 }
