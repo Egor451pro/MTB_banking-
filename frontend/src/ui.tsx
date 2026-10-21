@@ -162,6 +162,28 @@ export function Btn({ children, onClick, tone = 'primary', disabled, small, full
   )
 }
 
+// Кнопка с подтверждением: опасное действие (блокировка, заморозка) спрашивает ещё раз в шторке.
+// ask=false пропускает вопрос, например для разблокировки.
+export function ConfirmBtn({ ask = true, title, text, confirmLabel, onClick, ...btn }: {
+  ask?: boolean; title: string; text: string; confirmLabel: string
+  children: ReactNode; onClick: () => void | Promise<void>; tone?: Tone; small?: boolean; full?: boolean; icon?: IconName
+}) {
+  const [open, setOpen] = useState(false)
+  if (!ask) return <Btn {...btn} onClick={onClick} />
+  return (
+    <>
+      <Btn {...btn} onClick={() => setOpen(true)} />
+      <Sheet open={open} onClose={() => setOpen(false)} title={title}>
+        <div className="space-y-3">
+          <p className="text-[15px] text-muted">{text}</p>
+          <Btn tone="danger" onClick={async () => { await onClick(); setOpen(false) }}>{confirmLabel}</Btn>
+          <Btn tone="secondary" onClick={() => setOpen(false)}>Отмена</Btn>
+        </div>
+      </Sheet>
+    </>
+  )
+}
+
 // Плавающая кнопка-«таблетка», как «Оформить» в Moby
 export function FloatAction({ icon, label, onClick }: { icon: IconName; label: string; onClick: () => void }) {
   return (

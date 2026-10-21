@@ -4,7 +4,7 @@ import { dateTime, money } from '../format'
 import { useData } from '../hooks'
 import { Icon } from '../icons'
 import { useNav } from '../nav'
-import { Badge, Btn, Card, Field, Header, Loading, Note, Row, Sheet, toast } from '../ui'
+import { Btn, ConfirmBtn, Card, Field, Header, Loading, Note, Row, Sheet, toast } from '../ui'
 import type { VirtualCard } from '../types'
 import '../beaver.css'
 
@@ -30,7 +30,7 @@ export function CardArt({ holder, last4, expires, frozen, mini, className = '' }
         </div>
       </div>}
       {frozen && !mini && (
-        <div className="absolute left-3 top-3 flex items-center gap-1 rounded-full bg-white/90 px-2.5 py-1 text-xs font-semibold text-[#141416]">
+        <div className="absolute right-3 top-3 flex items-center gap-1 rounded-full bg-white/90 px-2.5 py-1 text-xs font-semibold text-[#141416]">
           <Icon name="lock" size={13} />Заморожена
         </div>
       )}
@@ -131,12 +131,12 @@ export function VirtualCardScreen({ meId, ageGroup }: { meId: number; ageGroup: 
         </div>
 
         <div className="grid grid-cols-2 gap-2">
-          <Btn tone="secondary" icon="shield" onClick={() => setShownUntil(showing ? 0 : Date.now() + 15000)}>{showing ? 'Скрыть данные' : 'Показать данные'}</Btn>
-          <Btn tone={frozen ? 'primary' : 'secondary'} icon={frozen ? 'unlock' : 'lock'} onClick={async () => {
+          <Btn tone="secondary" icon="shield" onClick={() => setShownUntil(showing ? 0 : Date.now() + 15000)}>{showing ? 'Скрыть' : 'Данные'}</Btn>
+          <ConfirmBtn ask={!frozen} title="Заморозить карту?" text="Оплата этой картой будет недоступна, пока ты её не разморозишь." confirmLabel="Заморозить" tone={frozen ? 'primary' : 'secondary'} icon={frozen ? 'unlock' : 'lock'} onClick={async () => {
             await api.setVirtualCardStatus(meId, frozen ? 'active' : 'frozen')
             await vc.reload()
             toast(frozen ? 'Карта разморожена' : 'Карта заморожена')
-          }}>{frozen ? 'Разморозить' : 'Заморозить'}</Btn>
+          }}>{frozen ? 'Разморозить' : 'Заморозить'}</ConfirmBtn>
         </div>
 
         {showing && (
@@ -165,10 +165,7 @@ export function VirtualCardScreen({ meId, ageGroup }: { meId: number; ageGroup: 
               title="Пластиковая карта" sub={`Закажи с доставкой или забери в отделении, от ${money(v.plastic_price_cents)}`}
             />
           ) : (
-            <Row
-              icon="card" title="Пластиковая карта" sub={plasticLine(v)}
-              right={<Badge tone={v.plastic.status === 'ready' ? 'solid' : 'sky'}>{PLASTIC_TEXT[v.plastic.status]}</Badge>}
-            />
+            <Row icon="card" title={`Пластик: ${PLASTIC_TEXT[v.plastic.status].toLowerCase()}`} sub={plasticLine(v)} />
           )}
           {v.plastic.ordered_at && <div className="px-4 py-2.5 text-[13px] text-muted">Заказана {dateTime(v.plastic.ordered_at)}</div>}
         </Card>
@@ -260,11 +257,11 @@ export function ParentVirtualCard({ childId, childName }: { childId: number; chi
                   <span className="font-semibold">Пластик: {PLASTIC_TEXT[v.plastic.status].toLowerCase()}.</span> {plasticLine(v)}
                 </div>
               )}
-              <Btn tone={v.status === 'frozen' ? 'primary' : 'danger'} icon={v.status === 'frozen' ? 'unlock' : 'lock'} onClick={async () => {
+              <ConfirmBtn ask={v.status !== 'frozen'} title="Заморозить карту?" text={`Оплата виртуальной картой ${childName} будет недоступна, пока вы её не разморозите.`} confirmLabel="Заморозить" tone={v.status === 'frozen' ? 'primary' : 'danger'} icon={v.status === 'frozen' ? 'unlock' : 'lock'} onClick={async () => {
                 await api.setVirtualCardStatus(childId, v.status === 'frozen' ? 'active' : 'frozen')
                 await reload()
                 toast(v.status === 'frozen' ? 'Карта разморожена' : 'Карта заморожена')
-              }}>{v.status === 'frozen' ? 'Разморозить карту' : 'Заморозить карту'}</Btn>
+              }}>{v.status === 'frozen' ? 'Разморозить карту' : 'Заморозить карту'}</ConfirmBtn>
             </>
           ) : (
             <p className="text-[15px] text-muted">
