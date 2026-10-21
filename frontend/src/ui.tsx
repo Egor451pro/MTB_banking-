@@ -398,7 +398,7 @@ export const CARD_ART = { kid: '/card/kid.jpg', teen: '/card/graduate.jpg', virt
 export function MiniCard({ last4, blocked, art = CARD_ART.kid }: { last4: string; blocked?: boolean; art?: string }) {
   return (
     <div className="relative h-[46px] w-[72px] shrink-0 overflow-hidden rounded-[10px] bg-[#0B0B12]">
-      <img src={art} alt="" draggable={false} style={{ transform: `scale(${art === CARD_ART.kid ? 1.13 : 1.06})` }} className={`h-full w-full object-cover ${blocked ? 'opacity-60 grayscale' : ''}`} />
+      <img src={art} alt="" draggable={false} className={`h-full w-full object-cover ${blocked ? 'opacity-60 grayscale' : ''}`} />
       <div className="absolute bottom-1 left-1.5 text-[9px] font-semibold tracking-wider text-white [text-shadow:0_1px_3px_rgba(0,0,0,0.7)]">•• {last4}</div>
     </div>
   )

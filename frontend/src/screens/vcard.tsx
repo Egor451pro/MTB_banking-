@@ -19,7 +19,7 @@ export function CardArt({ holder, last4, expires, frozen, mini, className = '', 
   holder?: string | null; last4?: string | null; expires?: string | null; frozen?: boolean; mini?: boolean; className?: string; art?: string
 }) {
   return (
-    <div className={`relative aspect-[1280/805] w-full overflow-hidden rounded-[20px] shadow-[0_18px_36px_-18px_rgba(20,30,80,0.6)] ${className}`}>
+    <div style={{ aspectRatio: 1.65 }} className={`relative w-full overflow-hidden rounded-[20px] shadow-[0_18px_36px_-18px_rgba(20,30,80,0.6)] ${className}`}>
       <img src={art ?? CARD_ART.virtual} alt="Виртуальная карта МТБанка" draggable={false}
         className={`absolute inset-0 h-full w-full object-cover transition ${frozen ? 'grayscale brightness-75' : ''}`} />
       {!mini && <div className="absolute inset-x-0 bottom-0 p-[5%] text-white [text-shadow:0_1px_6px_rgba(0,0,0,0.5)]">
@@ -304,8 +304,8 @@ export function DesignPicker({ open, onClose, childId, slot, title }: { open: bo
           return (
             <button key={d.id} type="button" onClick={() => { set(d.id); onClose() }} aria-label={`Дизайн «${d.name}»`} aria-pressed={on}
               className={`relative overflow-hidden rounded-[16px] bg-black text-left ring-2 transition active:scale-[0.98] ${on ? 'ring-mt-blue' : 'ring-transparent'}`}>
-              <div className="aspect-[1016/638] w-full overflow-hidden">
-                <img src={d.src} alt="" draggable={false} style={{ transform: 'scale(1.06)' }} className="h-full w-full object-cover" />
+              <div style={{ aspectRatio: 1.65 }} className="w-full overflow-hidden">
+                <img src={d.src} alt="" draggable={false} className="h-full w-full object-cover" />
               </div>
               <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/70 to-transparent px-2.5 pb-1.5 pt-5 text-[12px] font-semibold text-white">{d.name}</div>
               {on && <div className="absolute right-2 top-2 flex h-6 w-6 items-center justify-center rounded-full bg-mt-blue text-white"><Icon name="check" size={14} /></div>}
@@ -322,11 +322,10 @@ type LimitToday = { limit_cents: number | null; spent_cents: number; left_cents:
 
 export function CardFace({ art, card, label, chipTop }: { art: string; card: CardT; label: string; chipTop?: boolean }) {
   const blocked = card.status === 'blocked'
-  const zoom = art === CARD_ART.kid ? 1.13 : 1.06
   return (
     <div className="relative">
-      <div className={`relative aspect-[1016/638] w-full overflow-hidden rounded-[24px] bg-black ${blocked ? 'grayscale brightness-75' : ''}`}>
-        <img src={art} alt={label} draggable={false} style={{ transform: `scale(${zoom})` }} className="h-full w-full object-cover" />
+      <div style={{ aspectRatio: 1.65 }} className={`relative w-full overflow-hidden rounded-[24px] bg-black ${blocked ? 'grayscale brightness-75' : ''}`}>
+        <img src={art} alt={label} draggable={false} className="h-full w-full object-cover" />
       </div>
       <div className={`absolute ${chipTop ? 'right-3 top-3' : 'bottom-3 left-3'} rounded-2xl bg-black/45 px-3 py-1.5 text-white backdrop-blur-sm`}>
         <div className="text-[10px] font-semibold uppercase tracking-wide text-white/75">{blocked ? 'Заблокирована' : label} •• {card.last4}</div>
