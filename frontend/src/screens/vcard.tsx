@@ -298,8 +298,8 @@ export function CardsCarousel({ meId, card, limit }: { meId: number; card: CardT
   const mainBlocked = card.status === 'blocked'
   const main = (
     <div className="relative">
-      <div className={`relative aspect-[1016/638] w-full overflow-hidden rounded-[24px] bg-black shadow-[0_18px_36px_-18px_rgba(20,30,80,0.6)] ${mainBlocked ? 'grayscale brightness-75' : ''}`}>
-        <img src="/card/main.jpg" alt="Основная карта МТБанка" draggable={false} className="h-full w-full object-cover" />
+      <div className={`relative aspect-[1016/638] w-full overflow-hidden rounded-[24px] bg-black ${mainBlocked ? 'grayscale brightness-75' : ''}`}>
+        <img src="/card/main.jpg" alt="Основная карта МТБанка" draggable={false} className="h-full w-full scale-[1.06] object-cover" />
       </div>
       <div className="absolute bottom-3 left-3 rounded-2xl bg-white/15 px-3 py-1.5 text-white backdrop-blur-sm">
         <div className="text-[10px] font-semibold uppercase tracking-wide text-white/70">{mainBlocked ? 'Заблокирована' : 'Основная'} •• {card.last4}</div>
@@ -322,12 +322,12 @@ export function CardsCarousel({ meId, card, limit }: { meId: number; card: CardT
   return (
     <div>
       <div ref={track} onScroll={onScroll}
-        className="-mx-4 flex gap-3 snap-x snap-mandatory overflow-x-auto scroll-smooth px-4 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-        <div className="w-full shrink-0 snap-center">{main}</div>
+        className="flex snap-x snap-mandatory overflow-x-auto scroll-smooth [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+        <div className="w-full shrink-0 snap-center snap-always">{main}</div>
         <button type="button" onClick={() => push({ name: 'vcard' })} aria-label="Открыть виртуальную карту"
-          className="relative block w-full shrink-0 snap-center text-left transition active:scale-[0.99]">
+          className="relative block w-full shrink-0 snap-center snap-always text-left transition active:scale-[0.99]">
           <CardArt holder={v.issued ? v.holder : null} last4={v.issued ? v.last4 : null} mini={!v.issued} frozen={frozen}
-            className={`!rounded-[24px] ${v.issued ? '' : 'grayscale'}`} />
+            className={`!rounded-[24px] !shadow-none ${v.issued ? '' : 'grayscale'}`} />
           {v.issued ? (
             <div className="absolute right-3 top-3 rounded-full bg-black/45 px-3 py-1.5 text-white backdrop-blur-sm">
               <div className="text-[10px] font-semibold uppercase tracking-wide text-white/70">Баланс карты</div>
