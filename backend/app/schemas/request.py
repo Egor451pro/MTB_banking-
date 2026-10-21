@@ -16,7 +16,7 @@ Category = Literal[
     "education",
     "adult18",
 ]
-RequestType = Literal["money", "limit_increase", "category_unlock", "product_access"]
+RequestType = Literal["money", "limit_increase", "limit_once", "category_unlock", "product_access"]
 RequestStatus = Literal["pending", "approved", "rejected"]
 
 
@@ -29,7 +29,7 @@ class CreateRequestRequest(BaseModel):
 
     @model_validator(mode="after")
     def validate_payload(self):
-        if self.type in ("money", "limit_increase"):
+        if self.type in ("money", "limit_increase", "limit_once"):
             if self.amount_cents is None or self.amount_cents <= 0:
                 raise ValueError("amount_cents is required and must be > 0")
             self.category = None

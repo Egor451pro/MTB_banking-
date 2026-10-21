@@ -102,7 +102,7 @@ export function ChildPay({ meId }: { meId: number }) {
 
   // Что можно попросить у родителя, исходя из причины отказа
   function askFor(m: Merchant, reason: DeclineReason | null) {
-    if (reason === 'limit_exceeded') return { type: 'limit_increase' as ReqType, amount: m.cents }
+    if (reason === 'limit_exceeded') return { type: 'limit_once' as ReqType, amount: m.cents }
     if (reason === 'category_blocked' && m.category !== 'adult18') return { type: 'category_unlock' as ReqType, category: m.category }
     if (reason === 'insufficient_funds') return { type: 'money' as ReqType, amount: m.cents }
     return null
@@ -165,7 +165,8 @@ export function ChildPay({ meId }: { meId: number }) {
 // ───────── Запрос родителю ─────────
 const REQ_OPTIONS: { id: ReqType; title: string; sub: string }[] = [
   { id: 'money', title: 'Деньги на карту', sub: 'Не хватает на покупку' },
-  { id: 'limit_increase', title: 'Поднять дневной лимит', sub: 'Нужна покупка дороже лимита' },
+  { id: 'limit_once', title: 'Разово выше лимита', sub: 'Только на сегодня, лимит не меняется' },
+  { id: 'limit_increase', title: 'Поднять дневной лимит', sub: 'Навсегда, на каждый день' },
   { id: 'category_unlock', title: 'Открыть категорию', sub: 'Например, игры или подписки' },
   { id: 'product_access', title: 'Доступ к продукту', sub: 'Цели, вклад, виртуальная карта' },
 ]
@@ -229,7 +230,7 @@ export function RequestScreen({ type: t0, amount: a0, category: c0, permission: 
         )}
 
         {type === 'product_access' ? null : type !== 'category_unlock'
-          ? <Field label={type === 'money' ? 'Сколько нужно' : 'Какой лимит нужен в день'} inputMode="decimal" value={amount} onChange={setAmount} placeholder="0" suffix="BYN" />
+          ? <Field label={type === 'money' ? 'Сколько нужно' : type === 'limit_once' ? 'Сколько потратить сверх лимита сегодня' : 'Какой лимит нужен в день'} inputMode="decimal" value={amount} onChange={setAmount} placeholder="0" suffix="BYN" />
           : (
             <div className="grid grid-cols-3 gap-2">
               {cats.map((k) => {
@@ -247,7 +248,7 @@ export function RequestScreen({ type: t0, amount: a0, category: c0, permission: 
         <Field label="Зачем? Родитель увидит" value={comment} onChange={setComment} placeholder="Например, на экскурсию" />
         <Btn icon="chat" onClick={async () => {
           const cents = toCents(amount)
-          const needsSum = type === 'money' || type === 'limit_increase'
+          const needsSum = type === 'money' || type === 'limit_increase' || type === 'limit_once'
           if (needsSum && !(cents > 0)) { toast('Укажите сумму'); return }
           if (type === 'product_access' && !permission) { toast('Выбери продукт'); return }
           await api.createRequest({
@@ -705,7 +706,7 @@ export function QrPayScreen({ meId }: { meId: number }) {
   }
   const askFor = (): { type: ReqType; amount?: number; category?: Category } | null => {
     if (!m || !res || res.status !== 'declined') return null
-    if (res.decline_reason === 'limit_exceeded') return { type: 'limit_increase', amount: m.cents }
+    if (res.decline_reason === 'limit_exceeded') return { type: 'limit_once', amount: m.cents }
     if (res.decline_reason === 'category_blocked') return { type: 'category_unlock', category: m.category }
     if (res.decline_reason === 'insufficient_funds') return { type: 'money', amount: m.cents }
     return null

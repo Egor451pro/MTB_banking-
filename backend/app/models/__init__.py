@@ -26,6 +26,7 @@ from .models import (
 
 from .beaver import BeaverState
 from .virtual_card import VirtualCard
+from .limit_override import LimitOverride
 
 __all__ = [
     "Family",
@@ -52,5 +53,6 @@ __all__ = [
     "TaskStatus",
     "GoalStatus",
     "BeaverState",
-    "VirtualCard"
+    "VirtualCard",
+    "LimitOverride",
 ]

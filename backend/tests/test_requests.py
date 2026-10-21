@@ -68,3 +68,36 @@ async def test_approve_category_unlock_removes_limit(client: AsyncClient, seed_t
     assert limits.status_code == 200
     categories = [item["category"] for item in limits.json()["items"]]
     assert "subscriptions" not in categories
+
+
+@pytest.mark.asyncio
+async def test_limit_once_raises_only_today(client: AsyncClient, seed_test_data, db_session):
+    from app.models import Limit, LimitPeriod
+
+    child_id = seed_test_data["family1_child_id"]
+    parent_id = seed_test_data["family1_parent_id"]
+    db_session.add(Limit(child_id=child_id, category=None, period=LimitPeriod.DAY, amount_cents=100, is_blocked=False))
+    await db_session.commit()
+
+    pay = {"card_id": 10, "amount_cents": 300, "category": "food", "merchant": "Столовая", "is_online": False}
+    first = await client.post("/payments/simulate", headers={"X-User-Id": str(child_id)}, json=pay)
+    assert first.json()["decline_reason"] == "limit_exceeded"
+
+    created = await client.post(
+        "/requests", headers={"X-User-Id": str(child_id)},
+        json={"type": "limit_once", "amount_cents": 300, "comment": "Разово"},
+    )
+    assert created.status_code == 201
+    approved = await client.post(f"/requests/{created.json()['id']}/approve", headers={"X-User-Id": str(parent_id)})
+    assert approved.status_code == 200
+
+    second = await client.post("/payments/simulate", headers={"X-User-Id": str(child_id)}, json=pay)
+    assert second.json()["status"] == "approved"
+
+    # Лимит на сегодня вырос на разовую сумму, сам дневной лимит остался прежним
+    me = await client.get(f"/children/{child_id}", headers={"X-User-Id": str(parent_id)})
+    assert me.json()["limits_today"]["limit_cents"] == 400
+    from sqlalchemy import select
+    stored = (await db_session.execute(select(Limit).where(Limit.child_id == child_id, Limit.category.is_(None)))).scalar_one()
+    assert stored.amount_cents == 100
+

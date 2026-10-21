@@ -99,12 +99,13 @@ export function TaskHead({ t, who }: { t: Task; who?: string }) {
 // Короткая формулировка запроса для списков и карточек
 export function requestText(r: AccessRequest): string {
   if (r.type === 'money') return `${money(r.amount_cents ?? 0)} на карту`
+  if (r.type === 'limit_once') return `Разово ${money(r.amount_cents ?? 0)} сверх лимита`
   if (r.type === 'limit_increase') return `Лимит ${money(r.amount_cents ?? 0)} в день`
   if (r.type === 'product_access') return `Доступ: «${r.permission ? PERMISSION_INFO[r.permission].title : ''}»`
   return `Открыть «${r.category ? CATEGORY_LABEL[r.category] : ''}»`
 }
 
-export const REQ_ICON = { money: 'wallet', limit_increase: 'arrow-up', category_unlock: 'unlock', product_access: 'shield' } as const
+export const REQ_ICON = { money: 'wallet', limit_increase: 'arrow-up', limit_once: 'arrow-up', category_unlock: 'unlock', product_access: 'shield' } as const
 
 // Уровень показываем из GET /children/{id}: уровень — мотивация ребёнка, права меняет только родитель
 export function LevelRing({ level }: { level: ChildDetail['level'] }) {

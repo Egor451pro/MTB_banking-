@@ -171,6 +171,8 @@ export function mockApi(): Api {
   // Виртуальные карты подростков (на сервере это таблица virtual_cards)
   interface VCardRow { balance: number; holder: string; number: string; expires: string; cvc: string; status: 'active' | 'frozen'; method: 'pickup' | 'delivery' | null; address: string | null; orderedAt: number | null }
   let vcards: Record<number, VCardRow> = {}
+  // Разовые добавки к дневному лимиту: действуют до конца дня и не меняют сам лимит
+  let limitExtras: { childId: number; extra: number; day: number }[] = []
   const PLASTIC_PRICE = 1500, COURIER_FEE = 500, PLASTIC_READY_MS = 60_000
   const luhnNumber = () => {
     let body = '9112'
@@ -285,6 +287,9 @@ export function mockApi(): Api {
         && (category === undefined || t.category === category))
       .reduce((s, t) => s + t.amount_cents, 0)
 
+  const extraToday = (childId: number) =>
+    limitExtras.filter((e) => e.childId === childId && e.day === startOfToday()).reduce((s, e) => s + e.extra, 0)
+
   const generalLimit = (childId: number) =>
     (db.limits[childId] ?? []).find((l) => l.category === null && l.period === 'day' && !l.is_blocked)
 
@@ -312,7 +317,7 @@ export function mockApi(): Api {
     if (online && !perm(childId, 'online_payments')) return { status: 'declined', reason: 'online_not_allowed', text: 'Онлайн-покупки пока недоступны' }
     if (a.balance_cents < amount) return { status: 'declined', reason: 'insufficient_funds', text: 'На карте не хватает денег' }
     const gl = generalLimit(childId)
-    if (gl && spentToday(a.id) + amount > gl.amount_cents) return { status: 'declined', reason: 'limit_exceeded', text: 'Превышен дневной лимит' }
+    if (gl && spentToday(a.id) + amount > gl.amount_cents + extraToday(childId)) return { status: 'declined', reason: 'limit_exceeded', text: 'Превышен дневной лимит' }
     const catLimit = limits.find((l) => l.category === category && l.period === 'day' && !l.is_blocked && l.amount_cents > 0)
     if (catLimit && spentToday(a.id, category) + amount > catLimit.amount_cents) return { status: 'declined', reason: 'limit_exceeded', text: `Превышен лимит по категории «${CATEGORY_LABEL[category]}»` }
     if (online && amount > 2000) return { status: 'pending', reason: null, text: 'Покупка ждёт подтверждения родителя' }
@@ -383,7 +388,7 @@ export function mockApi(): Api {
       return delay({
         id: c.id, name: c.name, age_group: ageGroup(c),
         card: { id: a.id, last4: a.last4, balance_cents: a.balance_cents, status: a.status },
-        limits_today: { limit_cents: gl ? gl.amount_cents : null, spent_cents: spent, left_cents: gl ? Math.max(0, gl.amount_cents - spent) : null },
+        limits_today: { limit_cents: gl ? gl.amount_cents + extraToday(id) : null, spent_cents: spent, left_cents: gl ? Math.max(0, gl.amount_cents + extraToday(id) - spent) : null },
         level: { level: levelOf(c.xp), xp: c.xp, xp_to_next: xpToNext(c.xp) },
         permissions: { online_payments: perm(id, 'online_payments') },
       })
@@ -461,6 +466,8 @@ export function mockApi(): Api {
         const a = card(r.child_id)
         a.balance_cents += r.amount_cents
         db.txs.push({ id: ++db.seq.tx, account_id: a.id, amount_cents: r.amount_cents, direction: 'in', category: null, merchant: 'По запросу ребёнка', status: 'approved', decline_reason: null, created_at: new Date().toISOString() })
+      } else if (r.type === 'limit_once' && r.amount_cents) {
+        limitExtras.push({ childId: r.child_id, extra: r.amount_cents, day: startOfToday() })
       } else if (r.type === 'limit_increase' && r.amount_cents) {
         const list = db.limits[r.child_id] ?? (db.limits[r.child_id] = [])
         const g = list.find((l) => l.category === null && l.period === 'day')
@@ -614,7 +621,7 @@ export function mockApi(): Api {
       return delay({ applied: true })
     },
 
-    async demoReset() { db = seed(); beavers = {}; vcards = {}; return delay({ status: 'ok' }) },
+    async demoReset() { db = seed(); beavers = {}; vcards = {}; limitExtras = []; return delay({ status: 'ok' }) },
 
     // ───────── Виртуальная карта ─────────
     async getVirtualCard(childId) { access(childId); return delay(vcardView(childId)) },

@@ -54,6 +54,7 @@ class RequestType(str, enum.Enum):
     """Тип запроса ребенка"""
     MONEY = "money"
     LIMIT_INCREASE = "limit_increase"
+    LIMIT_ONCE = "limit_once"  # разово выше дневного лимита, только на сегодня
     CATEGORY_UNLOCK = "category_unlock"
     PRODUCT_ACCESS = "product_access"
 

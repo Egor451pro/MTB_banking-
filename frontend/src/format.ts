@@ -50,6 +50,7 @@ export const DECLINE_TEXT: Record<DeclineReason, string> = {
 export const REQ_LABEL: Record<ReqType, string> = {
   money: 'Деньги на карту',
   limit_increase: 'Поднять дневной лимит',
+  limit_once: 'Разово выше лимита',
   category_unlock: 'Открыть категорию',
   product_access: 'Доступ к продукту',
 }
@@ -57,6 +58,7 @@ export const REQ_LABEL: Record<ReqType, string> = {
 export const REQ_SHORT: Record<ReqType, string> = {
   money: 'Деньги',
   limit_increase: 'Лимит',
+  limit_once: 'Разово',
   category_unlock: 'Категория',
   product_access: 'Доступ',
 }

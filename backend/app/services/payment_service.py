@@ -127,7 +127,8 @@ class PaymentService:
         )
         if general_limit is not None:
             spent_today = await UserService.calculate_spent_today_cents(db=db, account_id=account.id)
-            if spent_today + request.amount_cents > general_limit.amount_cents:
+            today_limit = general_limit.amount_cents + await UserService.extra_limit_today_cents(db, account.owner_id)
+            if spent_today + request.amount_cents > today_limit:
                 return await PaymentService._save_and_response(
                     db=db,
                     account=account,

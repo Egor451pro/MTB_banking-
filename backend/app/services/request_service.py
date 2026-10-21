@@ -18,6 +18,7 @@ from app.models import (
     User,
     UserRole,
 )
+from app.models.limit_override import LimitOverride
 from app.schemas.request import (
     CreateRequestRequest,
     CreateRequestResponse,
@@ -25,6 +26,7 @@ from app.schemas.request import (
     RequestItem,
     RequestStatusResponse,
 )
+from app.services.user_service import UserService
 
 
 class RequestService:
@@ -96,6 +98,16 @@ class RequestService:
                     is_online=False,
                     status=TransactionStatus.APPROVED,
                     decline_reason=None,
+                )
+            )
+        elif req.type == RequestType.LIMIT_ONCE:
+            if req.amount_cents is None:
+                raise HTTPException(status_code=422, detail={"error": "validation_error", "message": "Сумма не указана"})
+            db.add(
+                LimitOverride(
+                    child_id=child.id,
+                    extra_cents=req.amount_cents,
+                    expires_at=UserService.end_of_day_utc_naive(),
                 )
             )
         elif req.type == RequestType.LIMIT_INCREASE:

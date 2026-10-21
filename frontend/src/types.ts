@@ -10,7 +10,7 @@ export type DeclineReason =
   | 'card_blocked' | 'category_blocked' | 'online_not_allowed'
   | 'insufficient_funds' | 'limit_exceeded'
 export type TxStatus = 'approved' | 'declined' | 'pending'
-export type ReqType = 'money' | 'limit_increase' | 'category_unlock' | 'product_access'
+export type ReqType = 'money' | 'limit_increase' | 'limit_once' | 'category_unlock' | 'product_access'
 export type ReqStatus = 'pending' | 'approved' | 'rejected'
 export type TaskStatus = 'new' | 'done' | 'confirmed' | 'rejected'
 // personal_data — обработка персональных данных ребёнка (Закон РБ № 99-З, до 16 лет согласие даёт законный представитель)

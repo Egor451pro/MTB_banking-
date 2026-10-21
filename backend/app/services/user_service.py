@@ -4,11 +4,12 @@
 from fastapi import HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func, or_
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 from typing import Optional
 import pytz
 
 from app.models import User, Account, Limit, Transaction, TransactionStatus, TransactionDirection, Consent
+from app.models.limit_override import LimitOverride
 from app.schemas.user import (
     MeResponse, ChildProfileResponse, AgeGroup,
     CardInfo, LimitsToday, LevelInfo, Permissions,
@@ -69,6 +70,21 @@ class UserService:
         start_of_day = now.replace(hour=0, minute=0, second=0, microsecond=0)
         start_of_day_utc = start_of_day.astimezone(pytz.utc).replace(tzinfo=None)
         return start_of_day_utc
+
+    @staticmethod
+    async def extra_limit_today_cents(db: AsyncSession, child_id: int) -> int:
+        """Сколько родитель разово добавил к дневному лимиту на сегодня"""
+        result = await db.execute(
+            select(func.sum(LimitOverride.extra_cents)).where(
+                LimitOverride.child_id == child_id,
+                LimitOverride.expires_at > datetime.utcnow(),
+            )
+        )
+        return result.scalar() or 0
+
+    @staticmethod
+    def end_of_day_utc_naive() -> datetime:
+        return UserService.get_start_of_day_utc_naive() + timedelta(days=1)
 
     @staticmethod
     async def calculate_spent_today_cents(
@@ -179,10 +195,11 @@ class UserService:
         
         # Формируем информацию о лимитах
         if general_limit:
+            today_limit = general_limit.amount_cents + await UserService.extra_limit_today_cents(db, child.id)
             limits_today = LimitsToday(
-                limit_cents=general_limit.amount_cents,
+                limit_cents=today_limit,
                 spent_cents=spent_cents,
-                left_cents=max(0, general_limit.amount_cents - spent_cents)
+                left_cents=max(0, today_limit - spent_cents)
             )
         else:
             limits_today = LimitsToday(
