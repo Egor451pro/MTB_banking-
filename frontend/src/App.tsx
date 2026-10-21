@@ -1,5 +1,5 @@
 import { useEffect, useState, type ReactNode } from 'react'
-import { api, session, usingMock, type LoginResult } from './api'
+import { api, demoLink, session, usingMock, type LoginResult } from './api'
 import { NavProvider, useNav } from './nav'
 import { BonusBannerHost, BottomNav, ToastHost, Loading, toast, type TabDef } from './ui'
 import { useData } from './hooks'
@@ -238,6 +238,20 @@ export default function App() {
           </button>
         )}
         {user?.role === 'child' && <BeaverDemo childId={user.id} />}
+        {!usingMock && (
+          <button
+            type="button"
+            onClick={async () => {
+              const link = demoLink()
+              try { await navigator.clipboard.writeText(link); toast('Ссылка на вашу базу скопирована') }
+              catch { window.prompt('Ссылка на вашу демо-базу:', link) }
+            }}
+            title="Открой эту ссылку на втором телефоне, чтобы попасть в ту же семью"
+            className="flex shrink-0 items-center gap-1 whitespace-nowrap rounded-full bg-elevated px-3 py-1 text-[13px] font-semibold text-muted transition hover:text-mt-ink"
+          >
+            <Icon name="phone" size={14} />Моя база
+          </button>
+        )}
         <button
           type="button"
           onClick={resetDemo}

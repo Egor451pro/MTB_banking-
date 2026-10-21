@@ -1,5 +1,6 @@
 import type { Api } from './index'
 import { session } from './index'
+import { demoSession } from './demoSession'
 
 export class ApiError extends Error {
   code: string
@@ -15,7 +16,7 @@ export function realApi(base: string): Api {
   async function call<T>(method: string, path: string, body?: unknown): Promise<T> {
     const res = await fetch(root + path, {
       method,
-      headers: { 'Content-Type': 'application/json', 'X-User-Id': String(session.userId) },
+      headers: { 'Content-Type': 'application/json', 'X-User-Id': String(session.userId), 'X-Demo-Session': demoSession.code },
       body: body === undefined ? undefined : JSON.stringify(body),
     })
     if (!res.ok) {

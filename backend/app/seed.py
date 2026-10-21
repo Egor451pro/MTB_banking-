@@ -48,16 +48,18 @@ async def clear_all_tables(session):
     _log("Таблицы очищены")
 
 
-async def seed_data():
-    """Наполняет БД демо-данными"""
+async def seed_data(eng=None, maker=None):
+    """Наполняет БД демо-данными. eng/maker — база конкретной демо-песочницы, по умолчанию общая app.db"""
+    eng = eng or engine
+    maker = maker or AsyncSessionLocal
     _log("Начинаем заполнение базы данных...")
     
     # Пересоздаём схему: seed полностью заменяет данные, так подхватываются новые колонки.
-    async with engine.begin() as conn:
+    async with eng.begin() as conn:
         await conn.run_sync(Base.metadata.drop_all)
         await conn.run_sync(Base.metadata.create_all)
     
-    async with AsyncSessionLocal() as session:
+    async with maker() as session:
         # Очищаем таблицы
         await clear_all_tables(session)
         

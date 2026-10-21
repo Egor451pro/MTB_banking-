@@ -8,6 +8,7 @@ import { mockApi } from './mock'
 
 // Текущий пользователь после демо-входа. Клиент шлёт его как X-User-Id.
 export const session = { userId: 0 }
+export { demoLink } from './demoSession'
 
 export type BeaverSave = { data: Record<string, unknown> | null; updated_at: number }
 
