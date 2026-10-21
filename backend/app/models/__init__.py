@@ -25,6 +25,7 @@ from .models import (
 )
 
 from .beaver import BeaverState
+from .virtual_card import VirtualCard
 
 __all__ = [
     "Family",
@@ -50,5 +51,6 @@ __all__ = [
     "RequestStatus",
     "TaskStatus",
     "GoalStatus",
-    "BeaverState"
+    "BeaverState",
+    "VirtualCard"
 ]

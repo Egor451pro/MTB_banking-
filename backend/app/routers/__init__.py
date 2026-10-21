@@ -10,6 +10,7 @@ from .demo import router as demo_router
 from .lesson import router as lesson_router
 from .loyalty import router as loyalty_router
 from .beaver import router as beaver_router
+from .virtual_card import router as virtual_card_router
 
 __all__ = [
     "user_router",
@@ -24,4 +25,5 @@ __all__ = [
     "lesson_router",
     "loyalty_router",
     "beaver_router",
+    "virtual_card_router",
 ]

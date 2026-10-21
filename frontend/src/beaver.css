@@ -37,3 +37,11 @@
 @keyframes qr-scan { 0%, 100% { top: 18% } 50% { top: 80% } }
 .qr-scanline { animation: qr-scan 2.2s ease-in-out infinite; }
 @media (prefers-reduced-motion: reduce) { .qr-scanline { animation: none; top: 50% } }
+
+/* Виртуальная карта: появление после выпуска */
+@keyframes card-in {
+  0%   { opacity: 0; transform: translateY(28px) rotate(-4deg) scale(.86); }
+  60%  { opacity: 1; transform: translateY(-4px) rotate(1deg) scale(1.02); }
+  100% { opacity: 1; transform: none; }
+}
+.card-in { animation: card-in .85s cubic-bezier(.2,.9,.2,1) both; }

@@ -11,6 +11,7 @@ import {
 import type { Category, DeclineReason, LessonResult, PayResult, PermissionKey, ReqType } from '../types'
 import { GoalCard, REQ_ICON, TaskHead, TxList, requestText } from './shared'
 import { MIN_GOAL_CENTS } from '../beaverState'
+import { CardEntry } from './vcard'
 import { BeaverPanel, LOGS_PER_LESSON, damSrc, logWord, useBeaverInfo } from './beaver'
 
 // ───────── Главная ребёнка ─────────
@@ -58,6 +59,8 @@ export function ChildHome({ meId }: { meId: number }) {
           </div>
           <Icon name="chevron-right" size={20} className="text-[#9AA6B8]" />
         </button>
+
+        {c.age_group === '14-17' && <CardEntry meId={meId} variant="home" />}
 
         <Section title="Последние операции">
           <TxList childId={meId} limit={5} poll={2000} />
@@ -458,6 +461,7 @@ export function ChildMe({ meId }: { meId: number }) {
             icon="coins" chevron onClick={() => push({ name: 'loyalty' })}
             title={`${(loyalty.data?.points ?? 0).toLocaleString('ru-RU')} баллов`} sub="Скидки и подарки у партнёров"
           />
+          <CardEntry meId={meId} variant="row" />
           <Row
             icon="chat" chevron onClick={() => push({ name: 'request' })}
             title="Мои запросы родителю" sub={waiting ? `Ждут ответа: ${waiting}` : 'Попросить деньги или доступ'}

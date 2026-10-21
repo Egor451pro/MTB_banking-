@@ -133,6 +133,7 @@ async def seed_data():
         session.add(Consent(child_id=anya.id, consent_type="online_payments"))
         session.add(Consent(child_id=anya.id, consent_type="goals"))
         session.add(Consent(child_id=anya.id, consent_type="savings"))
+        session.add(Consent(child_id=anya.id, consent_type="virtual_card"))
         session.add(Consent(child_id=anya.id, consent_type="partner_offers"))
         
         # 3b. Карманные деньги: Миша 10 BYN/неделя, Аня 20 BYN/неделя

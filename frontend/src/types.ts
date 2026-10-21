@@ -173,6 +173,21 @@ export interface PackageReq {
 
 // Права ребёнка в Moby: какие продукты он может оформлять, каким функционалом пользоваться
 export type PermissionKey = 'online_payments' | 'goals' | 'virtual_card' | 'savings' | 'partner_offers'
+export interface VirtualCard {
+  available: boolean                 // можно ли выпустить и пользоваться
+  locked_reason: string | null       // почему нельзя (возраст, нет разрешения родителя)
+  issued: boolean
+  holder: string | null
+  number: string | null              // полностью только у владельца, у родителя с маской
+  last4: string | null
+  expires: string | null
+  cvc: string | null
+  status: 'active' | 'frozen' | null
+  plastic: { status: 'none' | 'ordered' | 'ready'; method: 'pickup' | 'delivery' | null; address: string | null; ordered_at: string | null }
+  plastic_price_cents: number
+  courier_fee_cents: number
+}
+
 export interface Permission {
   key: PermissionKey
   enabled: boolean

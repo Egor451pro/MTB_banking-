@@ -11,6 +11,7 @@ import {
 import type { Category, ConsentType, LimitItem } from '../types'
 import { GoalCard, REQ_ICON, TaskHead, TxList, TxRow, requestText } from './shared'
 import { damSrc, logWord, useBeaverInfo } from './beaver'
+import { ParentVirtualCard } from './vcard'
 
 // Какого ребёнка открыть во вкладке «Дети» (выбирают на главной или после оформления карты)
 let selectedKid: number | null = null
@@ -318,6 +319,7 @@ export function ChildManage({ id, switcher }: { id: number; switcher?: ReactNode
           <Row icon="calendar" chevron title={KID_PAGE_TITLE.allowance} sub={allowanceText} onClick={() => open('allowance')} />
           <Row icon="wallet" chevron title={KID_PAGE_TITLE.limits} sub={limitText} onClick={() => open('limits')} />
           <Row icon="shield" chevron title={KID_PAGE_TITLE.perms} sub={perms.data ? `Включено ${permOn} из ${perms.data.items.length}` : ''} onClick={() => open('perms')} />
+          <ParentVirtualCard childId={id} childName={c.name} />
         </Card>
 
         <Card className="divide-y divide-line p-0">

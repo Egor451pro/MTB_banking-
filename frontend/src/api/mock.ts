@@ -2,7 +2,7 @@ import type { Api } from './index'
 import { session } from './index'
 import type {
   AccessRequest, AgeGroup, Allowance, Category, DeclineReason, Goal, Lesson, LevelInfo, LimitItem,
-  Offer, PayResult, Permission, PermissionKey, ReqStatus, Task, Transaction,
+  Offer, PayResult, Permission, PermissionKey, ReqStatus, Task, Transaction, VirtualCard,
 } from '../types'
 import { ageFrom, CATEGORY_LABEL } from '../format'
 
@@ -150,7 +150,7 @@ function seed(): DB {
       { id: 1, assigned_to: 2, title: 'Убрать в комнате', reward_cents: 200, xp_reward: 30, status: 'new', due_date: null },
       { id: 2, assigned_to: 2, title: 'Вынести мусор', reward_cents: 100, xp_reward: 15, status: 'done', due_date: null },
     ],
-    perms: { 2: { ...defaultPerms(false, false), partner_offers: true }, 3: { ...defaultPerms(true, true), savings: true, partner_offers: true } },
+    perms: { 2: { ...defaultPerms(false, false), partner_offers: true }, 3: { ...defaultPerms(true, true), savings: true, partner_offers: true, virtual_card: true } },
     allowance: { 2: { amount_cents: 1000, period: 'week', active: true }, 3: { amount_cents: 2000, period: 'week', active: true } },
     lessonsDone: { 3: [1, 3] },
     accepted: {},
@@ -168,6 +168,18 @@ export function mockApi(): Api {
   let db = seed()
   // Бобёр: то же правило, что на сервере: побеждает более новое состояние
   let beavers: Record<number, { data: Record<string, unknown>; updated_at: number }> = {}
+  // Виртуальные карты подростков (на сервере это таблица virtual_cards)
+  interface VCardRow { holder: string; number: string; expires: string; cvc: string; status: 'active' | 'frozen'; method: 'pickup' | 'delivery' | null; address: string | null; orderedAt: number | null }
+  let vcards: Record<number, VCardRow> = {}
+  const PLASTIC_PRICE = 1500, COURIER_FEE = 500, PLASTIC_READY_MS = 60_000
+  const luhnNumber = () => {
+    let body = '9112'
+    while (body.length < 15) body += Math.floor(Math.random() * 10)
+    let sum = 0
+    ;[...body].reverse().forEach((ch, i) => { let d = Number(ch); if (i % 2 === 0) { d *= 2; if (d > 9) d -= 9 } sum += d })
+    return body + String((10 - (sum % 10)) % 10)
+  }
+  const rub = (cents: number) => `${(cents / 100).toFixed(2).replace('.', ',')} BYN`
   function decideBonus(id: number, approve: boolean) {
     const m = requireParent()
     const b = db.bonuses.find((x) => x.id === id)
@@ -220,6 +232,21 @@ export function mockApi(): Api {
   }
 
   const isTeen = (u: UserRow) => ageFrom(u.birth_date) >= 14
+  const vcardView = (childId: number): VirtualCard => {
+    const owner = me().id === childId
+    const p = permList(childId).find((x) => x.key === 'virtual_card')
+    const locked = p?.locked_reason ?? (p?.enabled ? null : 'Родитель ещё не разрешил виртуальную карту')
+    const v = vcards[childId]
+    const base = { available: !locked, locked_reason: locked, plastic_price_cents: PLASTIC_PRICE, courier_fee_cents: COURIER_FEE }
+    if (!v) return { ...base, issued: false, holder: null, number: null, last4: null, expires: null, cvc: null, status: null, plastic: { status: 'none', method: null, address: null, ordered_at: null } }
+    const age = v.orderedAt ? Date.now() - v.orderedAt : 0
+    return {
+      ...base, issued: true, holder: v.holder,
+      number: owner ? v.number : `•••• •••• •••• ${v.number.slice(-4)}`,
+      last4: v.number.slice(-4), expires: owner ? v.expires : null, cvc: owner ? v.cvc : null, status: v.status,
+      plastic: { status: !v.orderedAt ? 'none' : age >= PLASTIC_READY_MS ? 'ready' : 'ordered', method: v.method, address: v.address, ordered_at: v.orderedAt ? new Date(v.orderedAt).toISOString() : null },
+    }
+  }
   const perm = (childId: number, key: PermissionKey) => !!db.perms[childId]?.[key]
   const permList = (childId: number): Permission[] => {
     const teen = isTeen(user(childId))
@@ -586,7 +613,52 @@ export function mockApi(): Api {
       return delay({ applied: true })
     },
 
-    async demoReset() { db = seed(); beavers = {}; return delay({ status: 'ok' }) },
+    async demoReset() { db = seed(); beavers = {}; vcards = {}; return delay({ status: 'ok' }) },
+
+    // ───────── Виртуальная карта ─────────
+    async getVirtualCard(childId) { access(childId); return delay(vcardView(childId)) },
+
+    async issueVirtualCard(childId, holder) {
+      const c = requireChild()
+      if (c.id !== childId) throw new MockError('forbidden', 'Нет доступа к профилю другого пользователя')
+      const v = vcardView(childId)
+      if (!v.available) throw new MockError('forbidden', v.locked_reason ?? 'Виртуальная карта недоступна')
+      if (!vcards[childId]) {
+        const name = (holder ?? c.name).trim().replace(/\s+/g, ' ').toUpperCase().slice(0, 26)
+        if (name.length < 2) throw new MockError('validation_error', 'Укажите имя на карте')
+        const now = new Date()
+        vcards[childId] = {
+          holder: name, number: luhnNumber(), cvc: String(Math.floor(Math.random() * 1000)).padStart(3, '0'),
+          expires: `${String(now.getMonth() + 1).padStart(2, '0')}/${String((now.getFullYear() + 4) % 100).padStart(2, '0')}`,
+          status: 'active', method: null, address: null, orderedAt: null,
+        }
+      }
+      return delay(vcardView(childId))
+    },
+
+    async setVirtualCardStatus(childId, status) {
+      access(childId)
+      if (!vcards[childId]) throw new MockError('not_found', 'Виртуальная карта ещё не выпущена')
+      vcards[childId].status = status
+      return delay(vcardView(childId))
+    },
+
+    async orderPlastic(childId, method, address) {
+      const c = requireChild()
+      if (c.id !== childId) throw new MockError('forbidden', 'Нет доступа к профилю другого пользователя')
+      const v = vcards[childId]
+      if (!v) throw new MockError('not_found', 'Сначала выпустите виртуальную карту')
+      if (v.orderedAt) throw new MockError('conflict', 'Пластиковая карта уже заказана')
+      if (method === 'delivery' && (address ?? '').trim().length < 5) throw new MockError('validation_error', 'Укажите адрес доставки')
+      const price = PLASTIC_PRICE + (method === 'delivery' ? COURIER_FEE : 0)
+      const a = card(childId)
+      if (a.status === 'blocked') throw new MockError('card_blocked', 'Карта заблокирована')
+      if (a.balance_cents < price) throw new MockError('insufficient_funds', `На карте не хватает денег: нужно ${rub(price)}`)
+      a.balance_cents -= price
+      db.txs.push({ id: ++db.seq.tx, account_id: a.id, amount_cents: price, direction: 'out', category: null, merchant: 'МТБанк · пластиковая карта', status: 'approved', decline_reason: null, created_at: new Date().toISOString() })
+      v.method = method; v.address = method === 'delivery' ? (address ?? '').trim() : null; v.orderedAt = Date.now()
+      return delay(vcardView(childId))
+    },
 
     async getBeaver(childId) {
       const b = beavers[childId]

@@ -10,6 +10,7 @@ import { KidPage, PackageFlow, ParentDecisions, ParentHome, ParentKids, ParentPr
 import { MobyShell } from './screens/moby'
 import { LoginScreen } from './screens/auth'
 import { BeaverDemo } from './screens/beaverDemo'
+import { VirtualCardScreen } from './screens/vcard'
 import { useTheme } from './theme'
 import { Icon } from './icons'
 
@@ -71,6 +72,7 @@ function ChildShell({ me }: { me: Me }) {
   else if (top?.name === 'loyalty') body = <LoyaltyScreen onBack={back} />
   else if (top?.name === 'pay') body = <ChildPay meId={me.id} />
   else if (top?.name === 'qr') body = <QrPayScreen meId={me.id} />
+  else if (top?.name === 'vcard') body = <VirtualCardScreen meId={me.id} ageGroup={me.age_group} />
   else if (tab === 'savings') body = <ChildSavings meId={me.id} />
   else if (tab === 'pet') body = <ChildBeaver meId={me.id} ageGroup={me.age_group} />
   else if (tab === 'tasks') body = <ChildTasks />

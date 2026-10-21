@@ -1,7 +1,7 @@
 import type {
   AccessRequest, Allowance, ApproveResult, Category, ChildDetail, DepositResult, FamilyResp, Goal, GoalsResp, Lesson, LessonResult,
   LevelInfo, LimitItem, LoyaltyInfo, Me, PackageReq, PayRequest, PayResult, PendingPurchase, PendingBonus, BonusDecision, Permission,
-  PermissionKey, ReqStatus, ReqType, Task, Transaction,
+  PermissionKey, ReqStatus, ReqType, Task, Transaction, VirtualCard,
 } from '../types'
 import { realApi } from './real'
 import { mockApi } from './mock'
@@ -45,6 +45,12 @@ export interface Api {
   demoReset(): Promise<{ status: string }>
 
   // Прогресс бобра хранится на сервере, чтобы был одним и тем же на всех устройствах
+  // Виртуальная карта подростка и заказ пластика
+  getVirtualCard(childId: number): Promise<VirtualCard>
+  issueVirtualCard(childId: number, holder?: string): Promise<VirtualCard>
+  setVirtualCardStatus(childId: number, status: 'active' | 'frozen'): Promise<VirtualCard>
+  orderPlastic(childId: number, method: 'pickup' | 'delivery', address?: string): Promise<VirtualCard>
+
   getBeaver(childId: number): Promise<BeaverSave>
   putBeaver(childId: number, data: Record<string, unknown>, updatedAt: number): Promise<BeaverSave>
 

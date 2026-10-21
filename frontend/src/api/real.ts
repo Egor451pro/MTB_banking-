@@ -60,6 +60,10 @@ export function realApi(base: string): Api {
     getLevel: (id) => get(`/children/${id}/level`),
     acceptSuggestion: (id) => post(`/children/${id}/level/suggestion/accept`),
     demoReset: () => post('/demo/reset'),
+    getVirtualCard: (id) => get(`/children/${id}/virtual-card`),
+    issueVirtualCard: (id, holder) => post(`/children/${id}/virtual-card`, { holder }),
+    setVirtualCardStatus: (id, status) => post(`/children/${id}/virtual-card/status`, { status }),
+    orderPlastic: (id, method, address) => post(`/children/${id}/virtual-card/plastic`, { method, address }),
     getBeaver: (id) => get(`/children/${id}/beaver`),
     putBeaver: (id, data, updated_at) => put(`/children/${id}/beaver`, { data, updated_at }),
 
